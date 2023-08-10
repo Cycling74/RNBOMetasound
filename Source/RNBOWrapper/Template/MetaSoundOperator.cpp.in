@@ -17,8 +17,11 @@ namespace Metasound
 {
 	namespace _OPERATOR_NAMESPACE_
 	{
+		_OPERATOR_PARAM_DECL_
+			/*
 		METASOUND_PARAM(InParamFreq, "Freq", "Freq.")
 		METASOUND_PARAM(OutParamAudio, "Out 1", "Audio output 1.")
+		*/
 	}
 
 	using namespace _OPERATOR_NAMESPACE_;
@@ -27,8 +30,13 @@ namespace Metasound
 		private:
 			RNBO::CoreObject CoreObject;
 			RNBO::ParameterEventInterfaceUniquePtr ParamInterface;
+
+			_OPERATOR_MEMBERS_DECL_
+
+			/*
 			FFloatReadRef Freq;
 			FAudioBufferWriteRef AudioOutput;
+			*/
 
 		public:
 			static const FNodeClassMetadata& GetNodeInfo() {
@@ -51,12 +59,13 @@ namespace Metasound
 
 				return Info;
 			}
+
 			static const FVertexInterface& GetVertexInterface() {
 				static const FVertexInterface Interface(
 						FInputVertexInterface(
-							TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamFreq), 0.0f)
-							//_OPERATOR_VERTEX_INPUTS_
+							_OPERATOR_VERTEX_INPUTS_
 							/*
+							   TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamFreq), 0.0f)
 							   TInputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamAudioInput)),
 							   TInputDataVertex<FTime>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamDelayTime), 1.0f),
 							   TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamDryLevel), 0.0f),
@@ -65,9 +74,9 @@ namespace Metasound
 							   */
 							),
 						FOutputVertexInterface(
-							TOutputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(OutParamAudio))
-							//_OPERATOR_VERTEX_OUTPUTS_
+							_OPERATOR_VERTEX_OUTPUTS_
 							/*
+							TOutputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(OutParamAudio))
 							   TOutputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(OutParamAudio))
 							   */
 							)
@@ -90,9 +99,12 @@ namespace Metasound
 					const FInputVertexInterface& InputInterface,
 					FBuildErrorArray& OutErrors
 				) :
-				CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(RNBO::freqcycleFactoryFunction(RNBO::Platform::get())()))
+				CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(RNBO::_OPERATOR_NAME_FactoryFunction(RNBO::Platform::get())()))
+				_OPERATOR_MEMBERS_INIT_
+				/*
 				, Freq(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(InParamFreq), InSettings))
 				, AudioOutput(FAudioBufferWriteRef::CreateNew(InSettings))
+				*/
 			{
 				CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
 				//all params are handled in the audio thread
@@ -102,15 +114,14 @@ namespace Metasound
 			virtual FDataReferenceCollection GetInputs() const override
 			{
 				FDataReferenceCollection InputDataReferences;
-				InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(InParamFreq), FFloatReadRef(Freq));
-
+				//InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(InParamFreq), FFloatReadRef(Freq));
 				return InputDataReferences;
 			}
 
 			virtual FDataReferenceCollection GetOutputs() const override
 			{
 				FDataReferenceCollection OutputDataReferences;
-				OutputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutParamAudio), FAudioBufferReadRef(AudioOutput));
+				//OutputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutParamAudio), FAudioBufferReadRef(AudioOutput));
 				return OutputDataReferences;
 			}
 
@@ -123,12 +134,13 @@ namespace Metasound
 
 			void Execute()
 			{
-				const std::array<float *, 0> ins = { };
-				std::array<float*, 1> outs = { AudioOutput->GetData() };
+				const std::array<float *, _OPERATOR_AUDIO_INPUT_COUNT_> ins = { _OPERATOR_AUDIO_INPUT_INIT_ };
+				std::array<float*, _OPERATOR_AUDIO_OUTPUT_COUNT_> outs = { _OPERATOR_AUDIO_OUTPUT_INIT_ };
 
-				int32 NumFrames = AudioOutput->Num();
+				int32 NumFrames = _OPERATOR_AUDIO_NUMFRAMES_MEMBER_->Num();
 
-				UpdateParam(0, *Freq);
+				_OPERATOR_PARAM_UPDATE_
+				//UpdateParam(0, *Freq);
 				CoreObject.process(ins.data(), ins.size(), outs.data(), outs.size(), NumFrames);
 			}
 	};

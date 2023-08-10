@@ -1,10 +1,56 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
+using EpicGames.Core;
 using System;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
+
+
+/*
+//Copied from unity project, TODO, Consolidate
+[System.Serializable]
+public class ParameterInfo {
+	public int index;
+
+	public string name;
+	public string paramId;
+	public string displayName;
+	public string unit;
+
+	public Float minimum;
+	public Float maximum;
+	public Float initialValue;
+	public int steps;
+
+	public List<string> enumValues;
+	public string meta;
+}
+
+[System.Serializable]
+public class Port {
+	public string tag;
+	public string meta;
+}
+
+[System.Serializable]
+public class DataRef {
+	public string id;
+	public string type;
+	public string file;
+}
+
+[System.Serializable]
+public class PatcherDescription {
+	public int numParameters;
+	public List<ParameterInfo> parameters;
+	public List<Port> inports;
+	public List<Port> outports;
+	public List<DataRef> externalDataRefs;
+}
+*/
 
 public class RNBOWrapper : ModuleRules
 {
@@ -102,6 +148,10 @@ public class RNBOWrapper : ModuleRules
 
 	string CreateMetaSound(string path) {
 		Regex rx = new Regex(@"PatcherFactoryFunctionPtr\s*(?<name>\w+)FactoryFunction", RegexOptions.Compiled);
+
+		var descPath = Path.Combine(path, "description.json");
+		JsonObject desc = JsonObject.Read(new FileReference(descPath));
+
 		//get name from cpp file
 		//TODO get some of this from metadata?
 		string name = null;
@@ -137,12 +187,85 @@ public class RNBOWrapper : ModuleRules
 		var description = "Test MetaSound";
 		var category = "Utility";
 
-		return OperatorTemplate
+		var v = OperatorTemplate
 		.Replace("_OPERATOR_NAMESPACE_", ns)
 		.Replace("_OPERATOR_NAME_", name)
 		.Replace("_OPERATOR_DISPLAYNAME_", displayName)
 		.Replace("_OPERATOR_DESCRIPTION_", description)
 		.Replace("_OPERATOR_CATEGORY", category)
 		;
+
+		List<string> paramDecl = new List<string>();
+		List<string> memberDecl = new List<string>();
+		List<string> memberInit = new List<string>();
+		List<string> paramUpdate = new List<string>();
+		List<string> vertexInputs = new List<string>();
+		List<string> vertexOutputs = new List<string>();
+		
+		foreach (JsonObject param in desc.GetObjectArrayField("parameters")) {
+			if (param.GetBoolField("visible")) {
+				string t = param.GetStringField("type");
+
+				string n = param.GetStringField("name");
+				string id = param.GetStringField("paramId");
+				int index = param.GetIntegerField("index");
+				double initial = param.GetDoubleField("initialValue");
+			}
+		}
+
+		int inputs = desc.GetIntegerField("numInputChannels");
+		int outputs = desc.GetIntegerField("numOutputChannels");
+		List<string> inputAudioInit = new List<string>();
+		List<string> outputAudioInit = new List<string>();
+
+		string numFramesMember = null;
+		for (int i = 0; i < inputs; i++)
+		{
+			string mname = String.Format("AudioInput{0}", i);
+			string pname = String.Format("InParamAudio{0}", i);
+
+			numFramesMember = mname;
+
+			memberDecl.Add(String.Format("FAudioBufferReadRef {0};", mname));
+			paramDecl.Add(String.Format("METASOUND_PARAM({0}, \"In {1}\", \"In {1}\")", pname, i + 1));
+
+			inputAudioInit.Add(String.Format("{0}->GetData()", mname));
+			memberInit.Add(String.Format("{0}(InputCollection.GetDataReadReferenceOrConstruct<FAudioBuffer>(METASOUND_GET_PARAM_NAME({1}), InParams.OperatorSettings)", mname, pname));
+
+			vertexInputs.Add(String.Format("TInputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA({0}))", pname));
+		}
+
+		for (int i = 0; i < outputs; i++)
+		{
+			string mname = String.Format("AudioOutput{0}", i);
+			string pname = String.Format("OutParamAudio{0}", i);
+
+			numFramesMember = mname;
+
+			memberDecl.Add(String.Format("FAudioBufferWriteRef {0};", mname));
+			paramDecl.Add(String.Format("METASOUND_PARAM({0}, \"Out {1}\", \"Out {1}\")", pname, i + 1));
+
+			outputAudioInit.Add(String.Format("{0}->GetData()", mname));
+			memberInit.Add(String.Format("{0}(FAudioBufferWriteRef::CreateNew(InSettings))", mname));
+
+			vertexOutputs.Add(String.Format("TOutputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA({0}))", pname));
+		}
+
+		v = v
+			.Replace("_OPERATOR_VERTEX_INPUTS_", String.Join(", ", vertexInputs))
+			.Replace("_OPERATOR_VERTEX_OUTPUTS_", String.Join(", ", vertexOutputs))
+
+			.Replace("_OPERATOR_AUDIO_INPUT_COUNT_", inputAudioInit.Count.ToString())
+			.Replace("_OPERATOR_AUDIO_INPUT_INIT_", String.Join(", ", inputAudioInit))
+			.Replace("_OPERATOR_AUDIO_OUTPUT_COUNT_", outputAudioInit.Count.ToString())
+			.Replace("_OPERATOR_AUDIO_OUTPUT_INIT_", String.Join(", ", outputAudioInit))
+			.Replace("_OPERATOR_MEMBERS_DECL_", String.Join("\n", memberDecl))
+			.Replace("_OPERATOR_MEMBERS_INIT_", memberInit.Count == 0 ? " " : ",\n" + String.Join(",\n", memberInit))
+			.Replace("_OPERATOR_PARAM_DECL_", String.Join("\n", paramDecl))
+			.Replace("_OPERATOR_PARAM_UPDATE_", String.Join(";\n", paramUpdate) + ";") 
+			.Replace("_OPERATOR_AUDIO_NUMFRAMES_MEMBER_", numFramesMember)
+			;
+
+		return v;
 	}
 }
