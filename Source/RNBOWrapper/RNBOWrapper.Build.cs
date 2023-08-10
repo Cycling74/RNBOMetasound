@@ -2,12 +2,21 @@
 
 using UnrealBuildTool;
 using System.IO;
+using System.Text;
 
 public class RNBOWrapper : ModuleRules
 {
+	string OperatorTemplate { get; set; }
+
 	public RNBOWrapper(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+
+		var templateFile = Path.Combine(PluginDirectory, "Source", "RNBOWrapper", "Template", "MetaSoundOperator.cpp.in");
+		using (StreamReader streamReader = new StreamReader(templateFile, Encoding.UTF8))
+		{
+			OperatorTemplate = streamReader.ReadToEnd();
+		}
 
 		var exportDir = Path.Combine(PluginDirectory, "Exports");
 		string rnboDir = null;
@@ -26,14 +35,15 @@ public class RNBOWrapper : ModuleRules
 					rnboDir = Path.Combine(path, "rnbo");
 				}
 
-				//TODO actually generate metasound node
-
 				//#include cpp files in export dir
 				foreach (var f in Directory.GetFiles(path, "*.cpp")) {
 					writer.WriteLine("#include \"{0}/{1}\" ", new DirectoryInfo(path).Name, Path.GetFileName(f));
 				}
+				writer.Write(CreateMetaSound(path));
 			}
 		}
+
+		ExternalDependencies.Add(templateFile);
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
@@ -86,5 +96,22 @@ public class RNBOWrapper : ModuleRules
 			);
 
 		PrivateDefinitions.Add("RNBO_NO_PATCHERFACTORY=1");
+	}
+
+	string CreateMetaSound(string path) {
+		var m = OperatorTemplate;
+		var ns = "RNBOOperator";
+		var name = "FreqCycle";
+		var displayName = "Freq Cycle";
+		var description = "Test MetaSound";
+		var category = "Utility";
+
+		return OperatorTemplate
+		.Replace("_OPERATOR_NAMESPACE_", ns)
+		.Replace("_OPERATOR_NAME_", name)
+		.Replace("_OPERATOR_DISPLAYNAME_", displayName)
+		.Replace("_OPERATOR_DESCRIPTION_", description)
+		.Replace("_OPERATOR_CATEGORY", category)
+		;
 	}
 }
