@@ -119,6 +119,7 @@ namespace Metasound
 
 				int32 NumFrames = AudioOutput->Num();
 
+				CoreObject.setParameterValue(0, (double)*Freq);
 				CoreObject.process(ins.data(), ins.size(), outs.data(), outs.size(), NumFrames);
 
 				/*
