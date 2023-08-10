@@ -16,79 +16,151 @@ namespace Metasound
 {
 	namespace _OPERATOR_NAMESPACE_
 	{
-		METASOUND_PARAM(InParamAudioInput, "In", "Audio input.")
-		METASOUND_PARAM(InParamDelayTime, "Delay Time", "The amount of time to delay the audio, in seconds.")
-		METASOUND_PARAM(InParamDryLevel, "Dry Level", "The dry level of the delay.")
-		METASOUND_PARAM(InParamWetLevel, "Wet Level", "The wet level of the delay.")
-		METASOUND_PARAM(InParamFeedbackAmount, "Feedback", "Feedback amount TEST.")
-		METASOUND_PARAM(OutParamAudio, "Out", "Audio output.")
-
-		// TODO: make this a static vertex
-		static float MaxDelaySeconds = 5.0f;
+		METASOUND_PARAM(InParamFreq, "Freq", "Freq.")
+		METASOUND_PARAM(OutParamAudio, "Out 1", "Audio output 1.")
 	}
 
 	class F_OPERATOR_NAME_Operator : public TExecutableOperator<F_OPERATOR_NAME_Operator>
 	{
-		public:
-
-			static const FNodeClassMetadata& GetNodeInfo();
-			static const FVertexInterface& GetVertexInterface();
-			static TUniquePtr<IOperator> CreateOperator(const FCreateOperatorParams& InParams, FBuildErrorArray& OutErrors);
-
-			F_OPERATOR_NAME_Operator(const FOperatorSettings& InSettings,
-					const FAudioBufferReadRef& InAudioInput,
-					const FTimeReadRef& InDelayTime,
-					const FFloatReadRef& InDryLevel,
-					const FFloatReadRef& InWetLevel,
-					const FFloatReadRef& InFeedback);
-
-			virtual FDataReferenceCollection GetInputs() const override;
-			virtual FDataReferenceCollection GetOutputs() const override;
-			void Execute();
-
 		private:
-			float GetInputDelayTimeMsec() const;
+			using namespace _OPERATOR_NAMESPACE_;
 
-			// The input audio buffer
-			FAudioBufferReadRef AudioInput;
-
-			// The amount of delay time
-			FTimeReadRef DelayTime;
-
-			// The dry level
-			FFloatReadRef DryLevel;
-
-			// The wet level
-			FFloatReadRef WetLevel;
-
-			// The feedback amount
-			FFloatReadRef Feedback;
-
-			// The audio output
+			FFloatReadRef Freq;
 			FAudioBufferWriteRef AudioOutput;
 
-			// The internal delay buffer
-			//Audio::FDelay DelayBuffer;
+		public:
+			static const FNodeClassMetadata& GetNodeInfo() {
+				auto InitNodeInfo = []() -> FNodeClassMetadata
+				{
+					FNodeClassMetadata Info;
+					Info.ClassName = { TEXT("UE"), "_OPERATOR_DISPLAYNAME_", TEXT("Audio") };
+					Info.MajorVersion = 1;
+					Info.MinorVersion = 1;
+					Info.DisplayName = METASOUND_LOCTEXT("_OPERATOR_NAME__DisplayName", "_OPERATOR_DISPLAYNAME_");
+					Info.Description = METASOUND_LOCTEXT("_OPERATOR_NAME__Description", "_OPERATOR_DESCRIPTION_");
+					Info.Author = PluginAuthor;
+					Info.PromptIfMissing = PluginNodeMissingPrompt;
+					Info.DefaultInterface = GetVertexInterface();
+					Info.CategoryHierarchy = { LOCTEXT("_OPERATOR_NAME__VolumeNodeCategory", "_OPERATOR_CATEGORY_") };
+					return Info;
+				};
 
-			// The previous delay time
-			float PrevDelayTimeMsec;
+				static const FNodeClassMetadata Info = InitNodeInfo();
 
-			// Feedback sample
-			float FeedbackSample;
+				return Info;
+			}
+			static const FVertexInterface& GetVertexInterface() {
+				static const FVertexInterface Interface(
+						FInputVertexInterface(
+							TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamFreq), 0.0f)
+							//_OPERATOR_VERTEX_INPUTS_
+							/*
+							   TInputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamAudioInput)),
+							   TInputDataVertex<FTime>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamDelayTime), 1.0f),
+							   TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamDryLevel), 0.0f),
+							   TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamWetLevel), 1.0f),
+							   TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamFeedbackAmount), 0.0f)
+							   */
+							),
+						FOutputVertexInterface(
+							TOutputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(OutParamAudio))
+							//_OPERATOR_VERTEX_OUTPUTS_
+							/*
+							   TOutputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(OutParamAudio))
+							   */
+							)
+						);
+
+				return Interface;
+			}
+
+			static TUniquePtr<IOperator> CreateOperator(const FCreateOperatorParams& InParams, FBuildErrorArray& OutErrors) {
+				const FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
+				const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
+
+				return MakeUnique<F_OPERATOR_NAME_Operator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutErrors);
+			}
+
+			F_OPERATOR_NAME_Operator(
+					const FCreateOperatorParams& InParams,
+					const FOperatorSettings& InSettings,
+					const FDataReferenceCollection& InputCollection,
+					const FInputVertexInterface& InputInterface,
+					FBuildErrorArray& OutErrors,
+				) :
+				Freq(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(InParamFreq), InSettings)),
+				AudioOutput(FAudioBufferWriteRef::CreateNew(InSettings))
+			{
+
+			}
+
+			virtual FDataReferenceCollection GetInputs() const override
+			{
+				FDataReferenceCollection InputDataReferences;
+				InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(InParamFreq), FFloatReadRef(Freq));
+
+				return InputDataReferences;
+			}
+
+			virtual FDataReferenceCollection GetOutputs() const override
+			{
+				FDataReferenceCollection OutputDataReferences;
+				OutputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutParamAudio), FAudioBufferReadRef(AudioOutput));
+				return OutputDataReferences;
+			}
+
+			void Execute()
+			{
+				/*
+				// Get clamped delay time
+				float CurrentInputDelayTime = GetInputDelayTimeMsec();
+
+				// Check to see if our delay amount has changed
+				if (!FMath::IsNearlyEqual(PrevDelayTimeMsec, CurrentInputDelayTime))
+				{
+					PrevDelayTimeMsec = CurrentInputDelayTime;
+					//DelayBuffer.SetEasedDelayMsec(PrevDelayTimeMsec);
+				}
+
+				const float* InputAudio = AudioInput->GetData();
+
+				float* OutputAudio = AudioOutput->GetData();
+				int32 NumFrames = AudioInput->Num();
+
+				// Clamp the feedback amount to make sure it's bounded. Clamp to a number slightly less than 1.0
+				float FeedbackAmount = FMath::Clamp(*Feedback, 0.0f, 1.0f - SMALL_NUMBER);
+				float CurrentDryLevel = FMath::Clamp(*DryLevel, 0.0f, 1.0f);
+				float CurrentWetLevel = FMath::Clamp(*WetLevel, 0.0f, 1.0f);
+
+				if (FMath::IsNearlyZero(FeedbackAmount))
+				{
+					FeedbackSample = 0.0f;
+
+					for (int32 FrameIndex = 0; FrameIndex < NumFrames; ++FrameIndex)
+					{
+						OutputAudio[FrameIndex] = 0;//CurrentWetLevel * DelayBuffer.ProcessAudioSample(InputAudio[FrameIndex]) + CurrentDryLevel * InputAudio[FrameIndex];
+					}
+				}
+				else
+				{
+					// There is some amount of feedback so we do the feedback mixing
+					for (int32 FrameIndex = 0; FrameIndex < NumFrames; ++FrameIndex)
+					{
+						OutputAudio[FrameIndex] = 0;//CurrentWetLevel * DelayBuffer.ProcessAudioSample(InputAudio[FrameIndex] + FeedbackSample * FeedbackAmount) + CurrentDryLevel * InputAudio[FrameIndex];
+						FeedbackSample = OutputAudio[FrameIndex];
+					}
+				}
+				*/
+			}
 	};
 
-	F_OPERATOR_NAME_Operator::F_OPERATOR_NAME_Operator(const FOperatorSettings& InSettings,
-			const FAudioBufferReadRef& InAudioInput,
-			const FTimeReadRef& InDelayTime,
-			const FFloatReadRef& InDryLevel,
-			const FFloatReadRef& InWetLevel,
-			const FFloatReadRef& InFeedback)
+	/*
+	F_OPERATOR_NAME_Operator::F_OPERATOR_NAME_Operator(
+			const FOperatorSettings& InSettings,
+			const FFloatReadRef& InFreq)
 
-		: AudioInput(InAudioInput)
-		, DelayTime(InDelayTime)
-		, DryLevel(InDryLevel)
-		, WetLevel(InWetLevel)
-		, Feedback(InFeedback)
+		: 
+		, Freq(InFreq)
 		, AudioOutput(FAudioBufferWriteRef::CreateNew(InSettings))
 		, PrevDelayTimeMsec(GetInputDelayTimeMsec())
 		, FeedbackSample(0.0f)
@@ -96,139 +168,6 @@ namespace Metasound
 			// DelayBuffer.Init(InSettings.GetSampleRate(), _OPERATOR_NAME_::MaxDelaySeconds);
 			// DelayBuffer.SetDelayMsec(PrevDelayTimeMsec);
 		}
-
-	FDataReferenceCollection F_OPERATOR_NAME_Operator::GetInputs() const
-	{
-		using namespace _OPERATOR_NAMESPACE_;
-		FDataReferenceCollection InputDataReferences;
-		InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(InParamAudioInput), FAudioBufferReadRef(AudioInput));
-		InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(InParamDelayTime), FTimeReadRef(DelayTime));
-		InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(InParamDryLevel), FFloatReadRef(DryLevel));
-		InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(InParamWetLevel), FFloatReadRef(WetLevel));
-		InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(InParamFeedbackAmount), FFloatReadRef(Feedback));
-
-		return InputDataReferences;
-	}
-
-	FDataReferenceCollection F_OPERATOR_NAME_Operator::GetOutputs() const
-	{
-		using namespace _OPERATOR_NAMESPACE_;
-		FDataReferenceCollection OutputDataReferences;
-		OutputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutParamAudio), FAudioBufferReadRef(AudioOutput));
-		return OutputDataReferences;
-	}
-
-	float F_OPERATOR_NAME_Operator::GetInputDelayTimeMsec() const
-	{
-		using namespace _OPERATOR_NAMESPACE_;
-
-		// Clamp the delay time to the max delay allowed
-		return 1000.0f * FMath::Clamp((float)DelayTime->GetSeconds(), 0.0f, MaxDelaySeconds);
-	}
-
-	void F_OPERATOR_NAME_Operator::Execute()
-	{
-		// Get clamped delay time
-		float CurrentInputDelayTime = GetInputDelayTimeMsec();
-
-		// Check to see if our delay amount has changed
-		if (!FMath::IsNearlyEqual(PrevDelayTimeMsec, CurrentInputDelayTime))
-		{
-			PrevDelayTimeMsec = CurrentInputDelayTime;
-			//DelayBuffer.SetEasedDelayMsec(PrevDelayTimeMsec);
-		}
-
-		const float* InputAudio = AudioInput->GetData();
-
-		float* OutputAudio = AudioOutput->GetData();
-		int32 NumFrames = AudioInput->Num();
-
-		// Clamp the feedback amount to make sure it's bounded. Clamp to a number slightly less than 1.0
-		float FeedbackAmount = FMath::Clamp(*Feedback, 0.0f, 1.0f - SMALL_NUMBER);
-		float CurrentDryLevel = FMath::Clamp(*DryLevel, 0.0f, 1.0f);
-		float CurrentWetLevel = FMath::Clamp(*WetLevel, 0.0f, 1.0f);
-
-		if (FMath::IsNearlyZero(FeedbackAmount))
-		{
-			FeedbackSample = 0.0f;
-
-			for (int32 FrameIndex = 0; FrameIndex < NumFrames; ++FrameIndex)
-			{
-				OutputAudio[FrameIndex] = 0;//CurrentWetLevel * DelayBuffer.ProcessAudioSample(InputAudio[FrameIndex]) + CurrentDryLevel * InputAudio[FrameIndex];
-			}
-		}
-		else
-		{
-			// There is some amount of feedback so we do the feedback mixing
-			for (int32 FrameIndex = 0; FrameIndex < NumFrames; ++FrameIndex)
-			{
-				OutputAudio[FrameIndex] = 0;//CurrentWetLevel * DelayBuffer.ProcessAudioSample(InputAudio[FrameIndex] + FeedbackSample * FeedbackAmount) + CurrentDryLevel * InputAudio[FrameIndex];
-				FeedbackSample = OutputAudio[FrameIndex];
-			}
-		}
-	}
-
-	const FVertexInterface& F_OPERATOR_NAME_Operator::GetVertexInterface()
-	{
-		/*
-		static const FVertexInterface Interface(
-				FInputVertexInterface(
-					TInputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamAudioInput)),
-					TInputDataVertex<FTime>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamDelayTime), 1.0f),
-					TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamDryLevel), 0.0f),
-					TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamWetLevel), 1.0f),
-					TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamFeedbackAmount), 0.0f)
-					),
-				FOutputVertexInterface(
-					TOutputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(OutParamAudio))
-					)
-				);
-
-		return Interface;
-		*/
-
-        auto InitVertexInterface = []() -> FVertexInterface {
-			using namespace _OPERATOR_NAMESPACE_;
-            FInputVertexInterface inputs;
-			inputs.Add(TInputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamAudioInput)));
-			inputs.Add(TInputDataVertex<FTime>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamDelayTime), 1.0f));
-			inputs.Add(TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamDryLevel), 0.0f));
-			inputs.Add(TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamWetLevel), 1.0f));
-			inputs.Add(TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(InParamFeedbackAmount), 0.0f));
-
-            FOutputVertexInterface outputs;
-			outputs.Add(TOutputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(OutParamAudio)));
-
-            FVertexInterface Interface(inputs, outputs);
-
-            return Interface;
-        };
-
-        static const FVertexInterface Interface = InitVertexInterface();
-        return Interface;
-	}
-
-	const FNodeClassMetadata& F_OPERATOR_NAME_Operator::GetNodeInfo()
-	{
-		auto InitNodeInfo = []() -> FNodeClassMetadata
-		{
-			FNodeClassMetadata Info;
-			Info.ClassName = { TEXT("UE"), "_OPERATOR_DISPLAYNAME_", TEXT("Audio") };
-			Info.MajorVersion = 1;
-			Info.MinorVersion = 1;
-			Info.DisplayName = METASOUND_LOCTEXT("_OPERATOR_NAME__DisplayName", "_OPERATOR_DISPLAYNAME_");
-			Info.Description = METASOUND_LOCTEXT("_OPERATOR_NAME__Description", "_OPERATOR_DESCRIPTION_");
-			Info.Author = PluginAuthor;
-			Info.PromptIfMissing = PluginNodeMissingPrompt;
-			Info.DefaultInterface = GetVertexInterface();
-            Info.CategoryHierarchy = { LOCTEXT("_OPERATOR_NAME__VolumeNodeCategory", "_OPERATOR_CATEGORY_") };
-			return Info;
-		};
-
-		static const FNodeClassMetadata Info = InitNodeInfo();
-
-		return Info;
-	}
 
 	TUniquePtr<IOperator> F_OPERATOR_NAME_Operator::CreateOperator(const FCreateOperatorParams& InParams, FBuildErrorArray& OutErrors)
 	{
@@ -245,6 +184,7 @@ namespace Metasound
 
 		return MakeUnique<F_OPERATOR_NAME_Operator>(InParams.OperatorSettings, AudioIn, DelayTime, DryLevel, WetLevel, Feedback);
 	}
+	*/
 
     using _OPERATOR_NAME_Node = FGenericNode<F_OPERATOR_NAME_Operator>;
 	METASOUND_REGISTER_NODE(_OPERATOR_NAME_Node)
