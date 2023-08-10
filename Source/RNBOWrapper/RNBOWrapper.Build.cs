@@ -10,49 +10,6 @@ using System.Text.RegularExpressions;
 using System.Collections.Generic;
 
 
-/*
-//Copied from unity project, TODO, Consolidate
-[System.Serializable]
-public class ParameterInfo {
-	public int index;
-
-	public string name;
-	public string paramId;
-	public string displayName;
-	public string unit;
-
-	public Float minimum;
-	public Float maximum;
-	public Float initialValue;
-	public int steps;
-
-	public List<string> enumValues;
-	public string meta;
-}
-
-[System.Serializable]
-public class Port {
-	public string tag;
-	public string meta;
-}
-
-[System.Serializable]
-public class DataRef {
-	public string id;
-	public string type;
-	public string file;
-}
-
-[System.Serializable]
-public class PatcherDescription {
-	public int numParameters;
-	public List<ParameterInfo> parameters;
-	public List<Port> inports;
-	public List<Port> outports;
-	public List<DataRef> externalDataRefs;
-}
-*/
-
 public class RNBOWrapper : ModuleRules
 {
 	string OperatorTemplate { get; set; }
