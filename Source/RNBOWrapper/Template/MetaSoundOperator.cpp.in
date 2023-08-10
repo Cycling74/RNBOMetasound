@@ -9,6 +9,7 @@
 #include "DSP/Delay.h"
 #include "MetasoundStandardNodesCategories.h"
 #include "MetasoundFacade.h"
+#include "RNBO.h"
 
 #define LOCTEXT_NAMESPACE "MetasoundStandardNodes_OPERATOR_NAME_"
 
@@ -20,11 +21,11 @@ namespace Metasound
 		METASOUND_PARAM(OutParamAudio, "Out 1", "Audio output 1.")
 	}
 
+	using namespace _OPERATOR_NAMESPACE_;
 	class F_OPERATOR_NAME_Operator : public TExecutableOperator<F_OPERATOR_NAME_Operator>
 	{
 		private:
-			using namespace _OPERATOR_NAMESPACE_;
-
+			RNBO::CoreObject CoreObject;
 			FFloatReadRef Freq;
 			FAudioBufferWriteRef AudioOutput;
 
@@ -41,7 +42,7 @@ namespace Metasound
 					Info.Author = PluginAuthor;
 					Info.PromptIfMissing = PluginNodeMissingPrompt;
 					Info.DefaultInterface = GetVertexInterface();
-					Info.CategoryHierarchy = { LOCTEXT("_OPERATOR_NAME__VolumeNodeCategory", "_OPERATOR_CATEGORY_") };
+					Info.CategoryHierarchy = { LOCTEXT("_OPERATOR_NAME__Category", "_OPERATOR_CATEGORY_") };
 					return Info;
 				};
 
@@ -86,11 +87,13 @@ namespace Metasound
 					const FOperatorSettings& InSettings,
 					const FDataReferenceCollection& InputCollection,
 					const FInputVertexInterface& InputInterface,
-					FBuildErrorArray& OutErrors,
+					FBuildErrorArray& OutErrors
 				) :
-				Freq(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(InParamFreq), InSettings)),
-				AudioOutput(FAudioBufferWriteRef::CreateNew(InSettings))
+				CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(RNBO::freqcycleFactoryFunction(RNBO::Platform::get())()))
+				, Freq(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(InParamFreq), InSettings))
+				, AudioOutput(FAudioBufferWriteRef::CreateNew(InSettings))
 			{
+				CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
 
 			}
 
@@ -111,6 +114,13 @@ namespace Metasound
 
 			void Execute()
 			{
+				const std::array<float *, 0> ins = { };
+				std::array<float*, 1> outs = { AudioOutput->GetData() };
+
+				int32 NumFrames = AudioOutput->Num();
+
+				CoreObject.process(static_cast<float * const*>(ins.data()), ins.size(), outs.data(), outs.size(), NumFrames);
+
 				/*
 				// Get clamped delay time
 				float CurrentInputDelayTime = GetInputDelayTimeMsec();
