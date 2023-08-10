@@ -32,12 +32,6 @@ namespace Metasound
 			RNBO::ParameterEventInterfaceUniquePtr ParamInterface;
 
 			_OPERATOR_MEMBERS_DECL_
-
-			/*
-			FFloatReadRef Freq;
-			FAudioBufferWriteRef AudioOutput;
-			*/
-
 		public:
 			static const FNodeClassMetadata& GetNodeInfo() {
 				auto InitNodeInfo = []() -> FNodeClassMetadata
@@ -101,10 +95,6 @@ namespace Metasound
 				) :
 				CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(RNBO::_OPERATOR_NAME_FactoryFunction(RNBO::Platform::get())()))
 				_OPERATOR_MEMBERS_INIT_
-				/*
-				, Freq(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(InParamFreq), InSettings))
-				, AudioOutput(FAudioBufferWriteRef::CreateNew(InSettings))
-				*/
 			{
 				CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
 				//all params are handled in the audio thread
@@ -114,14 +104,14 @@ namespace Metasound
 			virtual FDataReferenceCollection GetInputs() const override
 			{
 				FDataReferenceCollection InputDataReferences;
-				//InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(InParamFreq), FFloatReadRef(Freq));
+				_OPERATOR_GET_INPUTS_
 				return InputDataReferences;
 			}
 
 			virtual FDataReferenceCollection GetOutputs() const override
 			{
 				FDataReferenceCollection OutputDataReferences;
-				//OutputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutParamAudio), FAudioBufferReadRef(AudioOutput));
+				_OPERATOR_GET_OUTPUTS_
 				return OutputDataReferences;
 			}
 

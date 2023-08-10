@@ -4,6 +4,7 @@ using UnrealBuildTool;
 using EpicGames.Core;
 using System;
 using System.IO;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
@@ -201,6 +202,8 @@ public class RNBOWrapper : ModuleRules
 		List<string> paramUpdate = new List<string>();
 		List<string> vertexInputs = new List<string>();
 		List<string> vertexOutputs = new List<string>();
+		List<string> getInputs = new List<string>();
+		List<string> getOutputs = new List<string>();
 		
 		foreach (JsonObject param in desc.GetObjectArrayField("parameters")) {
 			if (param.GetBoolField("visible")) {
@@ -210,6 +213,20 @@ public class RNBOWrapper : ModuleRules
 				string id = param.GetStringField("paramId");
 				int index = param.GetIntegerField("index");
 				double initial = param.GetDoubleField("initialValue");
+
+				//TODO description etc from meta
+				string pname = String.Format("InParam{0}", id);
+				string mname = String.Format("Param{0}", id);
+
+				paramDecl.Add(String.Format("METASOUND_PARAM({0}, \"{1}\", \"{1}\")", pname, name));
+
+				vertexInputs.Add(String.Format("TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA({0}), {1}f)", pname, initial.ToString("N", CultureInfo.InvariantCulture)));
+				paramUpdate.Add(String.Format("UpdateParam({0}, *{1});", index, mname));
+
+				memberDecl.Add(String.Format("FFloatReadRef {0};", mname));
+				memberInit.Add(String.Format("{0}(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME({1}), InSettings))", mname, pname));
+
+				getInputs.Add(String.Format("InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME({0}), {1});", pname, mname));
 			}
 		}
 
@@ -233,6 +250,8 @@ public class RNBOWrapper : ModuleRules
 			memberInit.Add(String.Format("{0}(InputCollection.GetDataReadReferenceOrConstruct<FAudioBuffer>(METASOUND_GET_PARAM_NAME({1}), InParams.OperatorSettings)", mname, pname));
 
 			vertexInputs.Add(String.Format("TInputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA({0}))", pname));
+
+			getInputs.Add(String.Format("InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME({0}), {1});", pname, mname));
 		}
 
 		for (int i = 0; i < outputs; i++)
@@ -249,20 +268,23 @@ public class RNBOWrapper : ModuleRules
 			memberInit.Add(String.Format("{0}(FAudioBufferWriteRef::CreateNew(InSettings))", mname));
 
 			vertexOutputs.Add(String.Format("TOutputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA({0}))", pname));
+			getOutputs.Add(String.Format("OutputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME({0}), {1});", pname, mname));
 		}
 
 		v = v
 			.Replace("_OPERATOR_VERTEX_INPUTS_", String.Join(", ", vertexInputs))
 			.Replace("_OPERATOR_VERTEX_OUTPUTS_", String.Join(", ", vertexOutputs))
+			.Replace("_OPERATOR_GET_INPUTS_", String.Join("\n", getInputs))
+			.Replace("_OPERATOR_GET_OUTPUTS_", String.Join("\n", getOutputs))
 
 			.Replace("_OPERATOR_AUDIO_INPUT_COUNT_", inputAudioInit.Count.ToString())
 			.Replace("_OPERATOR_AUDIO_INPUT_INIT_", String.Join(", ", inputAudioInit))
 			.Replace("_OPERATOR_AUDIO_OUTPUT_COUNT_", outputAudioInit.Count.ToString())
 			.Replace("_OPERATOR_AUDIO_OUTPUT_INIT_", String.Join(", ", outputAudioInit))
 			.Replace("_OPERATOR_MEMBERS_DECL_", String.Join("\n", memberDecl))
-			.Replace("_OPERATOR_MEMBERS_INIT_", memberInit.Count == 0 ? " " : ",\n" + String.Join(",\n", memberInit))
+			.Replace("_OPERATOR_MEMBERS_INIT_", memberInit.Count == 0 ? " " : ", " + String.Join(",\n", memberInit))
 			.Replace("_OPERATOR_PARAM_DECL_", String.Join("\n", paramDecl))
-			.Replace("_OPERATOR_PARAM_UPDATE_", String.Join(";\n", paramUpdate) + ";") 
+			.Replace("_OPERATOR_PARAM_UPDATE_", String.Join("\n", paramUpdate)) 
 			.Replace("_OPERATOR_AUDIO_NUMFRAMES_MEMBER_", numFramesMember)
 			;
 
