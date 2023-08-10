@@ -1,8 +1,10 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
+using System;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 
 public class RNBOWrapper : ModuleRules
 {
@@ -99,10 +101,39 @@ public class RNBOWrapper : ModuleRules
 	}
 
 	string CreateMetaSound(string path) {
-		var m = OperatorTemplate;
-		var ns = "RNBOOperator";
-		var name = "FreqCycle";
-		var displayName = "Freq Cycle";
+		Regex rx = new Regex(@"PatcherFactoryFunctionPtr\s*(?<name>\w+)FactoryFunction", RegexOptions.Compiled);
+		//get name from cpp file
+		//TODO get some of this from metadata?
+		string name = null;
+
+		foreach (var filePath in Directory.GetFiles(path, "*.cpp")) {
+			using (var f = File.OpenRead(filePath))
+			{
+				var s = new StreamReader(f);
+
+				while (!s.EndOfStream)
+				{
+					var line = s.ReadLine();
+					var match = rx.Match(line);
+					if (match.Success) {
+						string n = match.Groups["name"].Value;
+						if (n != "GetPatcher") {
+							name = n;
+							break;
+						}
+					}
+				}
+
+				f.Close();
+			}
+		}
+
+		if (name == null) {
+			throw new ArgumentException(String.Format("Cannot find class name for export at: {0}", path), "path");
+		}
+
+		var ns = name + "Operator";
+		var displayName = name;
 		var description = "Test MetaSound";
 		var category = "Utility";
 
