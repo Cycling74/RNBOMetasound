@@ -186,14 +186,14 @@ public class RNBOWrapper : ModuleRules
 		var ns = name + "Operator";
 		var displayName = name;
 		var description = "Test MetaSound";
-		var category = "Utility";
+		var category = "RNBO";
 
 		var v = OperatorTemplate
 		.Replace("_OPERATOR_NAMESPACE_", ns)
 		.Replace("_OPERATOR_NAME_", name)
 		.Replace("_OPERATOR_DISPLAYNAME_", displayName)
 		.Replace("_OPERATOR_DESCRIPTION_", description)
-		.Replace("_OPERATOR_CATEGORY", category)
+		.Replace("_OPERATOR_CATEGORY_", category)
 		;
 
 		List<string> paramDecl = new List<string>();
