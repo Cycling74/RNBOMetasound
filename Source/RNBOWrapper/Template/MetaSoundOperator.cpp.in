@@ -119,7 +119,7 @@ namespace Metasound
 
 				int32 NumFrames = AudioOutput->Num();
 
-				CoreObject.process(static_cast<float * const*>(ins.data()), ins.size(), outs.data(), outs.size(), NumFrames);
+				CoreObject.process(ins.data(), ins.size(), outs.data(), outs.size(), NumFrames);
 
 				/*
 				// Get clamped delay time
