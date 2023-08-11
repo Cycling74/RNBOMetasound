@@ -18,6 +18,9 @@ public class RNBOWrapper : ModuleRules
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
+		UnsafeTypeCastWarningLevel = WarningLevel.Warning;
+		ShadowVariableWarningLevel = WarningLevel.Warning; 
+
 		var templateDir = Path.Combine(PluginDirectory, "Source", "RNBOWrapper", "Template");
 		var templateFile = Path.Combine(templateDir, "MetaSoundOperator.cpp.in");
 		var templateHeaderFile = Path.Combine(templateDir, "MetaSoundOperator.h.in");
