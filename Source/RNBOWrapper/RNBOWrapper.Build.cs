@@ -50,6 +50,7 @@ public class RNBOWrapper : ModuleRules
 		}
 
 		ExternalDependencies.Add(templateFile);
+		ExternalDependencies.Add(exportDir);
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
@@ -140,13 +141,11 @@ public class RNBOWrapper : ModuleRules
 			throw new ArgumentException(String.Format("Cannot find class name for export at: {0}", path), "path");
 		}
 
-		var ns = name + "Operator";
 		var displayName = name;
 		var description = "Test MetaSound";
 		var category = "RNBO";
 
 		var v = OperatorTemplate
-		.Replace("_OPERATOR_NAMESPACE_", ns)
 		.Replace("_OPERATOR_NAME_", name)
 		.Replace("_OPERATOR_DISPLAYNAME_", displayName)
 		.Replace("_OPERATOR_DESCRIPTION_", description)
@@ -175,7 +174,7 @@ public class RNBOWrapper : ModuleRules
 				string pname = String.Format("InParam{0}", id);
 				string mname = String.Format("Param{0}", id);
 
-				paramDecl.Add(String.Format("METASOUND_PARAM({0}, \"{1}\", \"{1}\")", pname, name));
+				paramDecl.Add(String.Format("METASOUND_PARAM({0}, \"{1}\", \"{1}\")", pname, n));
 
 				vertexInputs.Add(String.Format("TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA({0}), {1}f)", pname, initial.ToString("N", CultureInfo.InvariantCulture)));
 				paramUpdate.Add(String.Format("UpdateParam({0}, *{1});", index, mname));
@@ -204,7 +203,7 @@ public class RNBOWrapper : ModuleRules
 			paramDecl.Add(String.Format("METASOUND_PARAM({0}, \"In {1}\", \"In {1}\")", pname, i + 1));
 
 			inputAudioInit.Add(String.Format("{0}->GetData()", mname));
-			memberInit.Add(String.Format("{0}(InputCollection.GetDataReadReferenceOrConstruct<FAudioBuffer>(METASOUND_GET_PARAM_NAME({1}), InParams.OperatorSettings)", mname, pname));
+			memberInit.Add(String.Format("{0}(InputCollection.GetDataReadReferenceOrConstruct<FAudioBuffer>(METASOUND_GET_PARAM_NAME({1}), InSettings))", mname, pname));
 
 			vertexInputs.Add(String.Format("TInputDataVertex<FAudioBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA({0}))", pname));
 

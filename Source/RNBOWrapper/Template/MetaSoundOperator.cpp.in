@@ -13,14 +13,14 @@
 
 #define LOCTEXT_NAMESPACE "MetasoundStandardNodes_OPERATOR_NAME_"
 
-namespace Metasound
+namespace _OPERATOR_NAME_
 {
-	namespace _OPERATOR_NAMESPACE_
+	using namespace Metasound;
+	namespace 
 	{
 		_OPERATOR_PARAM_DECL_
 	}
 
-	using namespace _OPERATOR_NAMESPACE_;
 	class F_OPERATOR_NAME_Operator : public TExecutableOperator<F_OPERATOR_NAME_Operator>
 	{
 		private:
@@ -108,7 +108,7 @@ namespace Metasound
 
 			void Execute()
 			{
-				const std::array<float *, _OPERATOR_AUDIO_INPUT_COUNT_> ins = { _OPERATOR_AUDIO_INPUT_INIT_ };
+				const std::array<const float *, _OPERATOR_AUDIO_INPUT_COUNT_> ins = { _OPERATOR_AUDIO_INPUT_INIT_ };
 				std::array<float*, _OPERATOR_AUDIO_OUTPUT_COUNT_> outs = { _OPERATOR_AUDIO_OUTPUT_INIT_ };
 
 				int32 NumFrames = _OPERATOR_AUDIO_NUMFRAMES_MEMBER_->Num();
