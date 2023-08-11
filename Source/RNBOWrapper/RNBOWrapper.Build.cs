@@ -235,6 +235,8 @@ public class RNBOWrapper : ModuleRules
 			.Replace("_OPERATOR_DESCRIPTION_", description)
 			.Replace("_OPERATOR_CATEGORY_", category)
 
+			.Replace("_OPERATOR_ENABLE_TRANSPORT_", "1")
+
 			.Replace("_OPERATOR_VERTEX_INPUTS_", String.Join(", ", vertexInputs))
 			.Replace("_OPERATOR_VERTEX_OUTPUTS_", String.Join(", ", vertexOutputs))
 			.Replace("_OPERATOR_GET_INPUTS_", String.Join("\n", getInputs))

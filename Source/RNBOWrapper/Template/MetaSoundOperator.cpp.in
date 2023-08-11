@@ -4,6 +4,7 @@
 namespace _OPERATOR_NAME_
 {
 	using namespace Metasound;
+	using namespace RNBOWrapper;
 	namespace 
 	{
 		_OPERATOR_PARAM_DECL_
@@ -14,6 +15,20 @@ namespace _OPERATOR_NAME_
 		private:
 			RNBO::CoreObject CoreObject;
 			RNBO::ParameterEventInterfaceUniquePtr ParamInterface;
+
+#if _OPERATOR_ENABLE_TRANSPORT_
+			FTimeReadRef TransportBeatTime;
+			FFloatReadRef TransportBPM;
+			FBoolReadRef TransportRun;
+			FInt32ReadRef TransportNum;
+			FInt32ReadRef TransportDen;
+
+			double LastTransportBeatTime = -1.0;
+			float LastTransportBPM = 0.0f;
+			bool LastTransportRun = false;
+			int32 LastTransportNum = 0;
+			int32 LastTransportDen = 0;
+#endif
 
 			_OPERATOR_MEMBERS_DECL_
 		public:
@@ -39,14 +54,21 @@ namespace _OPERATOR_NAME_
 			}
 
 			static const FVertexInterface& GetVertexInterface() {
-				static const FVertexInterface Interface(
-						FInputVertexInterface(
-							_OPERATOR_VERTEX_INPUTS_
-							),
-						FOutputVertexInterface(
-							_OPERATOR_VERTEX_OUTPUTS_
-							)
-						);
+				auto Init = []() -> FVertexInterface
+				{
+					FInputVertexInterface inputs(_OPERATOR_VERTEX_INPUTS_);
+#if _OPERATOR_ENABLE_TRANSPORT_
+					inputs.Add(TInputDataVertex<FTime>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBeatTime), 0.0f));
+					inputs.Add(TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBPM), 120.0f));
+					inputs.Add(TInputDataVertex<bool>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportRun), true));
+					inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportNum), 4));
+					inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportDen), 4));
+#endif
+					FOutputVertexInterface outputs(_OPERATOR_VERTEX_OUTPUTS_);
+					FVertexInterface interface(inputs, outputs);
+					return interface;
+				};
+				static const FVertexInterface Interface = Init();
 
 				return Interface;
 			}
@@ -66,6 +88,15 @@ namespace _OPERATOR_NAME_
 					FBuildErrorArray& OutErrors
 				) :
 				CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(RNBO::_OPERATOR_NAME_FactoryFunction(RNBO::Platform::get())()))
+
+#if _OPERATOR_ENABLE_TRANSPORT_
+				, TransportBeatTime(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<FTime>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), InSettings))
+				, TransportBPM(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
+				, TransportRun(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
+				, TransportNum(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
+				, TransportDen(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
+#endif
+
 				_OPERATOR_MEMBERS_INIT_
 			{
 				CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
@@ -100,6 +131,45 @@ namespace _OPERATOR_NAME_
 				std::array<float*, _OPERATOR_AUDIO_OUTPUT_COUNT_> outs = { _OPERATOR_AUDIO_OUTPUT_INIT_ };
 
 				int32 NumFrames = _OPERATOR_AUDIO_NUMFRAMES_MEMBER_->Num();
+
+#if _OPERATOR_ENABLE_TRANSPORT_
+
+				double btime = std::max(0.0, TransportBeatTime->GetSeconds()); //not actually seconds
+				if (LastTransportBeatTime != btime)
+				{ 
+					LastTransportBeatTime = btime;
+					RNBO::BeatTimeEvent event(0, btime);
+
+					ParamInterface->scheduleEvent(event);
+				}
+
+				float bpm = std::max(0.0f, *TransportBPM);
+				if (LastTransportBPM != bpm)
+				{ 
+					LastTransportBPM = bpm;
+
+					RNBO::TempoEvent event(0, bpm);
+					ParamInterface->scheduleEvent(event);
+				}
+
+				if (LastTransportRun != *TransportRun)
+				{ 
+					LastTransportRun = *TransportRun;
+					RNBO::TransportEvent event(0, LastTransportRun ? RNBO::TransportState::RUNNING : RNBO::TransportState::STOPPED);
+					ParamInterface->scheduleEvent(event);
+				}
+
+				int32 num = std::max(1, *TransportNum);
+				int32 den = std::max(1, *TransportDen);
+				if (LastTransportNum != num || LastTransportDen != den)
+				{ 
+					LastTransportNum = num;
+					LastTransportDen = den;
+
+					RNBO::TimeSignatureEvent event(0, num, den);
+					ParamInterface->scheduleEvent(event);
+				}
+#endif
 
 				_OPERATOR_PARAM_UPDATE_
 				CoreObject.process(ins.data(), ins.size(), outs.data(), outs.size(), NumFrames);
