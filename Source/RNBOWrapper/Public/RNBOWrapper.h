@@ -29,7 +29,7 @@ namespace RNBOWrapper {
       }
   };
 
-#define LOCTEXT_NAMESPACE "RNBOWrapper"
+#define LOCTEXT_NAMESPACE "FRNBOWrapperModule"
 		METASOUND_PARAM(ParamTransportBeatTime, "Transport Beat Time", "The beat time of the transport.")
 		METASOUND_PARAM(ParamTransportBPM, "Transport BPM", "The tempo of the transport in beats per minute.")
 		METASOUND_PARAM(ParamTransportRun, "Transport Run", "The run state of the transport.")
