@@ -22,16 +22,16 @@ public:
 
 namespace RNBOWrapper {
   template <class Op>
-    class FGenericNode : public Metasound::FNodeFacade
-  {
-    public:
-      /**
-       * Constructor used by the Metasound Frontend.
-       */
-      FGenericNode(const Metasound::FNodeInitData& InitData)
-        : Metasound::FNodeFacade(InitData.InstanceName, InitData.InstanceID, Metasound::TFacadeOperatorClass<Op>())
-      {
-      }
+		class FGenericNode : public Metasound::FNodeFacade
+	{
+		public:
+			/**
+			 * Constructor used by the Metasound Frontend.
+			 */
+			FGenericNode(const Metasound::FNodeInitData& InitData)
+				: Metasound::FNodeFacade(InitData.InstanceName, InitData.InstanceID, Metasound::TFacadeOperatorClass<Op>())
+			{
+			}
   };
 
 #define LOCTEXT_NAMESPACE "FRNBOWrapperModule"
@@ -46,19 +46,19 @@ namespace RNBOWrapper {
 
 namespace Metasound {
   //TODO  METASOUNDFRONTEND_API ?
-  class METASOUNDFRONTEND_API FTransport {
-    public:
-      FTransport() : BeatTime(0.0) { }
-			explicit FTransport(const FOperatorSettings& InSettings, bool bShouldRun) : 
-        BeatTime(0.0),
-        Run(bShouldRun) {
-      }
-    private:
-      FTime BeatTime;
-      bool Run = false;
-      float BPM = 120.0f;
-      int32 TimeSigNum = 4;
-      int32 TimeSigDen = 4;
+	class METASOUNDFRONTEND_API FTransport {
+		public:
+			FTransport() : BeatTime(0.0) { }
+			explicit FTransport(bool bShouldRun) : 
+				BeatTime(0.0),
+				Run(bShouldRun) {
+				}
+		private:
+			FTime BeatTime;
+			bool Run = false;
+			float BPM = 120.0f;
+			int32 TimeSigNum = 4;
+			int32 TimeSigDen = 4;
   };
   //XXX what about the METASOUNDFRONTEND_API ?
 	DECLARE_METASOUND_DATA_REFERENCE_TYPES(FTransport, METASOUNDFRONTEND_API, FTransportTypeInfo, FTransportReadRef, FTransportWriteRef);
