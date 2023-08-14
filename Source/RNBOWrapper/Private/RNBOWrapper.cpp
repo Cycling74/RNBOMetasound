@@ -82,9 +82,10 @@ namespace
 					FInputVertexInterface inputs;
 					inputs.Add(TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBPM), 120.0f));
 					inputs.Add(TInputDataVertex<bool>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportRun), true));
+					inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportNum), 4));
+					inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportDen), 4));
 
 					FOutputVertexInterface outputs;
-					outputs.Add(TOutputDataVertex<FTime>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBeatTime)));
 					outputs.Add(TOutputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
 
 					FVertexInterface Interface(inputs, outputs);
@@ -110,15 +111,16 @@ namespace
 					const FInputVertexInterface& InputInterface,
 					FBuildErrorArray& OutErrors)
 				:
-					Foo(FTransportWriteRef::CreateNew(false))
-				, BlockSize(InSettings.GetNumFramesPerBlock())
+				 BlockSize(InSettings.GetNumFramesPerBlock())
 				, SampleRate(static_cast<double>(InSettings.GetSampleRate()))
 				, BlockPeriod(InSettings.GetNumFramesPerBlock() / InSettings.GetSampleRate())
 				, PeriodMul(8.0 / 480.0 * InSettings.GetNumFramesPerBlock() / InSettings.GetSampleRate())
-				, TransportBeatTime(FTimeWriteRef::CreateNew(0.0))
+				, CurTransportBeatTime(0.0)
 				, TransportBPM(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
 				, TransportRun(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
-				, CurTransportBeatTime(0.0)
+				, TransportNum(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
+				, TransportDen(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
+				, Transport(FTransportWriteRef::CreateNew(false))
 			{
 			}
 
@@ -126,37 +128,41 @@ namespace
 			{
 				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBPM), TransportBPM);
 				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportRun), TransportRun);
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportNum), TransportNum);
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportDen), TransportDen);
 			}
 
 			virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
 			{
-				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), TransportBeatTime);
-				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransport), Foo);
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransport), Transport);
 			}
 
 			void Execute() {
-				if (*TransportRun) {
-					FTime offset(PeriodMul * static_cast<double>(*TransportBPM));
+				FTransport Cur(*TransportRun, *TransportBPM, *TransportNum, *TransportDen);
+				if (Cur.GetBPM()) {
+					FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
 					CurTransportBeatTime += offset;
 				}
-				*TransportBeatTime = CurTransportBeatTime;
+				Cur.SetBeatTime(CurTransportBeatTime);
+				*Transport = Cur;
 			}
 
 		private:
-			FTransportWriteRef Foo;
-
 			FSampleCount BlockSize;
 			FSampleRate SampleRate;
 			FTime BlockPeriod;
 			double PeriodMul;
 
-			FTimeWriteRef TransportBeatTime;
-			FFloatReadRef TransportBPM;
-			FBoolReadRef TransportRun;
-
 			FTime CurTransportBeatTime;
 			float LastTransportBPM = 0.0f;
 			bool LastTransportRun = false;
+
+			FFloatReadRef TransportBPM;
+			FBoolReadRef TransportRun;
+			FInt32ReadRef TransportNum;
+			FInt32ReadRef TransportDen;
+
+			FTransportWriteRef Transport;
 	};
 
 	using TransportOperatorNode = FGenericNode<FTransportOperator>;
