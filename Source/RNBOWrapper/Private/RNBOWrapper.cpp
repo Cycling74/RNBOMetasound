@@ -52,6 +52,13 @@ namespace
 	using namespace Metasound;
 	using namespace RNBOWrapper;
 
+	namespace {
+		METASOUND_PARAM(ParamTransportBPM, "BPM", "The tempo of the transport in beats per minute.")
+		METASOUND_PARAM(ParamTransportRun, "Run", "The run state of the transport.")
+		METASOUND_PARAM(ParamTransportNum, "Numerator", "The transport time signature numerator.")
+		METASOUND_PARAM(ParamTransportDen, "Denominator", "The transport time signature denominator.")
+	}
+
 	class FTransportOperator : public TExecutableOperator<FTransportOperator>
 	{
 		public:

@@ -36,11 +36,6 @@ namespace RNBOWrapper {
 
 #define LOCTEXT_NAMESPACE "FRNBOWrapperModule"
 		METASOUND_PARAM(ParamTransport, "Transport", "The transport.")
-		METASOUND_PARAM(ParamTransportBeatTime, "Transport Beat Time", "The beat time of the transport.")
-		METASOUND_PARAM(ParamTransportBPM, "Transport BPM", "The tempo of the transport in beats per minute.")
-		METASOUND_PARAM(ParamTransportRun, "Transport Run", "The run state of the transport.")
-		METASOUND_PARAM(ParamTransportNum, "Transport Numerator", "The transport time signature numerator.")
-		METASOUND_PARAM(ParamTransportDen, "Transport Denominator", "The transport time signature denominator.")
 #undef LOCTEXT_NAMESPACE
 }
 
@@ -65,8 +60,7 @@ namespace Metasound {
 			void SetRun(bool v) { Run = v; }
 			void SetBPM(float v) { BPM = std::max(0.0f, v); }
 			void SetTimeSig(std::tuple<int32, int32> v) { 
-				//TODO clamp
-				TimeSig = v; 
+				TimeSig = std::make_tuple(std::max(1, std::get<0>(v)), std::max(1, std::get<1>(v))); 
 			}
 
 		private:
