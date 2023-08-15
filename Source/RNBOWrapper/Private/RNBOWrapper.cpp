@@ -4,6 +4,8 @@
 #include "MetasoundFrontendRegistries.h"
 #include "MetasoundSampleCounter.h"
 
+#include "MetasoundDataTypeRegistrationMacro.h"
+
 #define LOCTEXT_NAMESPACE "FRNBOWrapperModule"
 
 void FRNBOWrapperModule::StartupModule()
@@ -19,10 +21,43 @@ void FRNBOWrapperModule::ShutdownModule()
 }
 
 
+namespace Metasound {
+
+	// Disable constructor pins of triggers 
+	template<>
+	struct TEnableConstructorVertex<FTransport>
+	{
+		static constexpr bool Value = false;
+	};
+
+	// Disable arrays of triggers
+	template<>
+	struct TEnableAutoArrayTypeRegistration<FTransport>
+	{
+		static constexpr bool Value = false;
+	};
+
+	// Disable auto-conversions based on FTransport implicit converters
+	template<typename ToDataType>
+	struct TEnableAutoConverterNodeRegistration<FTransport, ToDataType>
+	{
+		static constexpr bool Value = !std::is_arithmetic<ToDataType>::value;
+	};
+
+  REGISTER_METASOUND_DATATYPE(FTransport, "Transport", ::Metasound::ELiteralType::Boolean)
+}
+
 namespace 
 {
 	using namespace Metasound;
 	using namespace RNBOWrapper;
+
+	namespace {
+		METASOUND_PARAM(ParamTransportBPM, "BPM", "The tempo of the transport in beats per minute.")
+		METASOUND_PARAM(ParamTransportRun, "Run", "The run state of the transport.")
+		METASOUND_PARAM(ParamTransportNum, "Numerator", "The transport time signature numerator.")
+		METASOUND_PARAM(ParamTransportDen, "Denominator", "The transport time signature denominator.")
+	}
 
 	class FTransportOperator : public TExecutableOperator<FTransportOperator>
 	{
@@ -54,9 +89,11 @@ namespace
 					FInputVertexInterface inputs;
 					inputs.Add(TInputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBPM), 120.0f));
 					inputs.Add(TInputDataVertex<bool>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportRun), true));
+					inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportNum), 4));
+					inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportDen), 4));
 
 					FOutputVertexInterface outputs;
-					outputs.Add(TOutputDataVertex<FTime>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBeatTime)));
+					outputs.Add(TOutputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
 
 					FVertexInterface Interface(inputs, outputs);
 
@@ -81,37 +118,40 @@ namespace
 					const FInputVertexInterface& InputInterface,
 					FBuildErrorArray& OutErrors)
 				:
-				BlockSize(InSettings.GetNumFramesPerBlock())
+				 BlockSize(InSettings.GetNumFramesPerBlock())
 				, SampleRate(static_cast<double>(InSettings.GetSampleRate()))
 				, BlockPeriod(InSettings.GetNumFramesPerBlock() / InSettings.GetSampleRate())
 				, PeriodMul(8.0 / 480.0 * InSettings.GetNumFramesPerBlock() / InSettings.GetSampleRate())
-				, TransportBeatTime(FTimeWriteRef::CreateNew(0.0))
+				, CurTransportBeatTime(0.0)
 				, TransportBPM(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
 				, TransportRun(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
-				, CurTransportBeatTime(0.0)
+				, TransportNum(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
+				, TransportDen(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
+				, Transport(FTransportWriteRef::CreateNew(false))
 			{
 			}
 
-			virtual FDataReferenceCollection GetInputs()  const override {
-				FDataReferenceCollection InputDataReferences;
-				InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(ParamTransportBPM), TransportBPM);
-				InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(ParamTransportRun), TransportRun);
-				return InputDataReferences;
+			virtual void BindInputs(FInputVertexInterfaceData& InOutVertexData) override
+			{
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBPM), TransportBPM);
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportRun), TransportRun);
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportNum), TransportNum);
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportDen), TransportDen);
 			}
 
-			virtual FDataReferenceCollection GetOutputs() const override {
-				FDataReferenceCollection OutputDataReferences;
-				OutputDataReferences.
-                AddDataReadReference(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), TransportBeatTime);
-				return OutputDataReferences;
+			virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
+			{
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransport), Transport);
 			}
 
 			void Execute() {
-				if (*TransportRun) {
-					FTime offset(PeriodMul * static_cast<double>(*TransportBPM));
+				FTransport Cur(*TransportRun, *TransportBPM, *TransportNum, *TransportDen);
+				if (Cur.GetBPM()) {
+					FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
 					CurTransportBeatTime += offset;
 				}
-				*TransportBeatTime = CurTransportBeatTime;
+				Cur.SetBeatTime(CurTransportBeatTime);
+				*Transport = Cur;
 			}
 
 		private:
@@ -120,13 +160,16 @@ namespace
 			FTime BlockPeriod;
 			double PeriodMul;
 
-			FTimeWriteRef TransportBeatTime;
-			FFloatReadRef TransportBPM;
-			FBoolReadRef TransportRun;
-
 			FTime CurTransportBeatTime;
 			float LastTransportBPM = 0.0f;
 			bool LastTransportRun = false;
+
+			FFloatReadRef TransportBPM;
+			FBoolReadRef TransportRun;
+			FInt32ReadRef TransportNum;
+			FInt32ReadRef TransportDen;
+
+			FTransportWriteRef Transport;
 	};
 
 	using TransportOperatorNode = FGenericNode<FTransportOperator>;
