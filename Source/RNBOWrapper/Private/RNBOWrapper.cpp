@@ -41,7 +41,13 @@ namespace Metasound {
 	template<typename ToDataType>
 	struct TEnableAutoConverterNodeRegistration<FTransport, ToDataType>
 	{
-		static constexpr bool Value = !std::is_arithmetic<ToDataType>::value;
+		static constexpr bool Value = false;
+	};
+
+	template<typename FromDataType>
+	struct TEnableAutoConverterNodeRegistration<FromDataType, FTransport>
+	{
+		static constexpr bool Value = false;
 	};
 
   REGISTER_METASOUND_DATATYPE(FTransport, "Transport", ::Metasound::ELiteralType::Boolean)
