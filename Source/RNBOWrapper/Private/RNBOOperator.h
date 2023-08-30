@@ -105,8 +105,7 @@ using namespace Metasound;
 
 template<
 const RNBO::Json& desc,
-typename FactoryFunction
-//extern "C" RNBO::PatcherFactoryFunctionPtr(FactoryFunction*)(RNBO::PlatformInterface* platformInterface)
+RNBO::PatcherFactoryFunctionPtr(*FactoryFunction)(RNBO::PlatformInterface* platformInterface)
 >
 class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>
 {
@@ -164,7 +163,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
             static const FVertexInterface& GetVertexInterface() {
                 auto Init = []() -> FVertexInterface
                 {
-                    FInputVertexInterface inputs;//(_OPERATOR_VERTEX_INPUTS_);
+                    FInputVertexInterface inputs;
 
                     for (auto& p: InputFloatParams()) {
                         inputs.Add(TInputDataVertex<float>(p.Name(), p.MetaData(), p.InitialValue()));
@@ -177,7 +176,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
 #if 0
                     inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
 #endif
-                    FOutputVertexInterface outputs;//(_OPERATOR_VERTEX_OUTPUTS_);
+                    FOutputVertexInterface outputs;
 
                     for (auto& p: OutputAudioParams()) {
                         outputs.Add(TOutputDataVertex<FAudioBuffer>(p.Name(), p.MetaData()));
@@ -206,7 +205,6 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     FBuildErrorArray& OutErrors
                     ) :
                 CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())()))
-
 #if 0
                 , Transport(InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)))
 #endif
@@ -217,22 +215,21 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         ParamInterface = CoreObject.createParameterInterface(RNBO::ParameterEventInterface::NotThreadSafe, nullptr);
                     }
 
-            virtual FDataReferenceCollection GetInputs() const override
-            {
-                FDataReferenceCollection InputDataReferences;
-#if 0
-                InputDataReferences.AddDataReadReference(METASOUND_GET_PARAM_NAME(ParamTransport), Transport);
-#endif
-                //TODO _OPERATOR_GET_INPUTS_
-                    return InputDataReferences;
-            }
+			virtual void BindInputs(FInputVertexInterfaceData& InOutVertexData) override
+			{
+                //TODO Transport
+                /*
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBPM), TransportBPM);
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportRun), TransportRun);
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportNum), TransportNum);
+				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportDen), TransportDen);
+                */
+			}
 
-            virtual FDataReferenceCollection GetOutputs() const override
-            {
-                FDataReferenceCollection OutputDataReferences;
-                //TODO _OPERATOR_GET_OUTPUTS_
-                    return OutputDataReferences;
-            }
+			virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
+			{
+				//InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransport), Transport);
+			}
 
             void UpdateParam(RNBO::ParameterIndex i, float f) {
                 double v = static_cast<double>(f);

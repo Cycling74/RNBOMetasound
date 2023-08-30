@@ -200,6 +200,8 @@ namespace _OPERATOR_NAME_
 			}
 	};
 
+    using _OPERATOR_NAME_Operator2 = FRNBOOperator<desc, RNBO::_OPERATOR_NAME_FactoryFunction>;
+
     using _OPERATOR_NAME_Node = FGenericNode<F_OPERATOR_NAME_Operator>;
 	METASOUND_REGISTER_NODE(_OPERATOR_NAME_Node)
 }
