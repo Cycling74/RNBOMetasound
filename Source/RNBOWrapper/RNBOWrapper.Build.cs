@@ -118,7 +118,9 @@ public class RNBOWrapper : ModuleRules
 		Regex rx = new Regex(@"PatcherFactoryFunctionPtr\s*(?<name>\w+)FactoryFunction", RegexOptions.Compiled);
 
 		var descPath = Path.Combine(path, "description.json");
-		JsonObject desc = JsonObject.Read(new FileReference(descPath));
+
+        string descString = File.ReadAllText(descPath);
+		JsonObject desc = JsonObject.Parse(descString);
 
 		//get name from cpp file
 		//TODO get some of this from metadata?
@@ -231,6 +233,8 @@ public class RNBOWrapper : ModuleRules
 
 		return OperatorTemplate
 			.Replace("_OPERATOR_NAME_", name)
+            //TODO chunk for windows
+			.Replace("_OPERATOR_DESC_", String.Format("R\"RNBOLIT({0})RNBOLIT\"", descString))
 			.Replace("_OPERATOR_DISPLAYNAME_", displayName)
 			.Replace("_OPERATOR_DESCRIPTION_", description)
 			.Replace("_OPERATOR_CATEGORY_", category)

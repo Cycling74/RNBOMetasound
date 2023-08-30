@@ -12,6 +12,8 @@
 #include "MetasoundExecutableOperator.h"
 #include "MetasoundOperatorSettings.h"
 
+#include "MetasoundVertex.h"
+
 class FRNBOWrapperModule : public IModuleInterface
 {
 public:
@@ -40,6 +42,32 @@ namespace RNBOWrapper {
 }
 
 namespace Metasound {
+
+  class FRNBOMetasoundParam {
+    public:
+      FRNBOMetasoundParam(const FString name, const FText tooltip, const FText displayName) :
+        mName(name), 
+#if WITH_EDITOR
+        mTooltip(tooltip), mDisplayName(displayName)
+#else
+          mTooltip(FText::GetEmpty()), mDisplayName(FText::GetEmpty())
+#endif
+          {}
+
+      FDataVertexMetadata MetaData() const {
+        return { Tooltip(), DisplayName() };
+      }
+
+      const TCHAR * Name() const { return mName.GetCharArray().GetData(); }
+      const FText Tooltip() const { return mTooltip; }
+      const FText DisplayName() const { return mDisplayName; }
+
+    private:
+      const FString mName;
+      const FText mTooltip;
+      const FText mDisplayName;
+  };
+
   //TODO  METASOUNDFRONTEND_API ?
 	class METASOUNDFRONTEND_API FTransport {
 		public:

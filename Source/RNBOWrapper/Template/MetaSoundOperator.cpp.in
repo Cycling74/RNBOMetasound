@@ -5,8 +5,33 @@ namespace _OPERATOR_NAME_
 {
 	using namespace Metasound;
 	using namespace RNBOWrapper;
+
 	namespace 
 	{
+        const RNBO::Json desc = RNBO::Json::parse(_OPERATOR_DESC_);
+
+        static const std::vector<FRNBOMetasoundParam>& Params() {
+            auto Init = []() -> std::vector<FRNBOMetasoundParam>
+            {
+                std::vector<FRNBOMetasoundParam> params;
+
+                for (auto& p: desc["parameters"]) {
+                    std::string name = p["name"].get<std::string>();
+                    std::string displayName = p["displayName"].get<std::string>();
+                    std::string id = p["paramId"].get<std::string>();
+                    if (displayName.size() == 0) {
+                        displayName = name;
+                    }
+                    params.emplace_back(FString(name.c_str()), FText::AsCultureInvariant(id.c_str()), FText::AsCultureInvariant(displayName.c_str()));
+                }
+
+                return params;
+            };
+
+            static const std::vector<FRNBOMetasoundParam> Params = Init();
+            return Params;
+        }
+
 		_OPERATOR_PARAM_DECL_
 	}
 
@@ -52,11 +77,17 @@ namespace _OPERATOR_NAME_
 			static const FVertexInterface& GetVertexInterface() {
 				auto Init = []() -> FVertexInterface
 				{
-					FInputVertexInterface inputs(_OPERATOR_VERTEX_INPUTS_);
+					FInputVertexInterface inputs;//(_OPERATOR_VERTEX_INPUTS_);
+                    
+                    for (auto& p: Params()) {
+                        inputs.Add(TInputDataVertex<float>(p.Name(), p.MetaData(), 120.0f));
+                    }
+
 #if _OPERATOR_ENABLE_TRANSPORT_
 					inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
 #endif
 					FOutputVertexInterface outputs(_OPERATOR_VERTEX_OUTPUTS_);
+
 					FVertexInterface interface(inputs, outputs);
 					return interface;
 				};
