@@ -4,6 +4,7 @@
 #include "RNBO.h"
 #include "MetasoundPrimitives.h"
 #include "Internationalization/Text.h"
+#include <unordered_map>
 
 class FRNBOMetasoundParam {
     public:
@@ -25,10 +26,11 @@ class FRNBOMetasoundParam {
         const FText DisplayName() const { return mDisplayName; }
         float InitialValue() const { return mInitialValue; }
 
-        static std::vector<FRNBOMetasoundParam> InputFloat(const RNBO::Json& desc) {
-            std::vector<FRNBOMetasoundParam> params;
+        static std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> InputFloat(const RNBO::Json& desc) {
+            std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> params;
 
             for (auto& p: desc["parameters"]) {
+                RNBO::ParameterIndex index = static_cast<RNBO::ParameterIndex>(p["index"].get<int>());
                 std::string name = p["name"].get<std::string>();
                 std::string displayName = p["displayName"].get<std::string>();
                 std::string id = p["paramId"].get<std::string>();
@@ -36,7 +38,10 @@ class FRNBOMetasoundParam {
                 if (displayName.size() == 0) {
                     displayName = name;
                 }
-                params.emplace_back(FString(name.c_str()), FText::AsCultureInvariant(id.c_str()), FText::AsCultureInvariant(displayName.c_str()), initialValue);
+                params.emplace(
+                        index, 
+                        FRNBOMetasoundParam(FString(name.c_str()), FText::AsCultureInvariant(id.c_str()), FText::AsCultureInvariant(displayName.c_str()), initialValue)
+                        );
             }
 
             return params;
@@ -73,36 +78,13 @@ class FRNBOMetasoundParam {
 };
 
 
-/*
-namespace 
-{
-    const RNBO::Json desc = RNBO::Json::parse(_OPERATOR_DESC_);
-
-    static const std::vector<FRNBOMetasoundParam>& InputFloatParams() {
-        static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
-        return Params;
-    }
-
-    static const std::vector<FRNBOMetasoundParam>& InputAudioParams() {
-        static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputAudio(desc);
-        return Params;
-    }
-
-    static const std::vector<FRNBOMetasoundParam>& OutputAudioParams() {
-        static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::OutputAudio(desc);
-        return Params;
-    }
-
-    _OPERATOR_PARAM_DECL_
-}
-*/
-
 //UNDO
 using namespace Metasound;
 
 #undef LOCTEXT_NAMESPACE
 #define LOCTEXT_NAMESPACE "FRNBOOperator"
 
+//https://en.cppreference.com/w/cpp/language/template_parameters
 template<
 const RNBO::Json& desc,
 RNBO::PatcherFactoryFunctionPtr(*FactoryFunction)(RNBO::PlatformInterface* platformInterface)
@@ -112,6 +94,14 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
     private:
         RNBO::CoreObject CoreObject;
         RNBO::ParameterEventInterfaceUniquePtr ParamInterface;
+
+        std::unordered_map<RNBO::ParameterIndex, FFloatReadRef> mInputFloatParams;
+
+        std::vector<FAudioBufferReadRef> mInputAudioParams;
+        std::vector<const float *> mInputAudioBuffers;
+
+        std::vector<FAudioBufferWriteRef> mOutputAudioParams;
+        std::vector<float *> mOutputAudioBuffers;
 
 #if 0
         FTransportReadRef Transport;
@@ -123,8 +113,8 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
         int32 LastTransportDen = 0;
 #endif
 
-    static const std::vector<FRNBOMetasoundParam>& InputFloatParams() {
-        static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
+    static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputFloatParams() {
+        static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
         return Params;
     }
 
@@ -142,16 +132,35 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
             static const FNodeClassMetadata& GetNodeInfo() {
                 auto InitNodeInfo = []() -> FNodeClassMetadata
                 {
+                    auto meta = desc["meta"];
+                    std::string classname = meta["rnboobjname"];
+                    std::string name;
+                    std::string description = "RNBO Generated";
+                    std::string category = "RNBO";
+
+                    if (meta.contains("name")) {
+                        name = meta["name"];
+                    }
+                    if (name.size() == 0 || name.compare("untitled") == 0) {
+                        name = classname;
+                    }
+                    //TODO description and category from meta?
+
+                    FName ClassName(FString(classname.c_str()));
+                    FText DisplayName = FText::AsCultureInvariant(name.c_str());
+                    FText Description = FText::AsCultureInvariant(description.c_str());
+                    FText Category = FText::AsCultureInvariant(category.c_str());
+
                     FNodeClassMetadata Info;
-                    Info.ClassName = { TEXT("UE"), "_OPERATOR_DISPLAYNAME_", TEXT("Audio") };
+                    Info.ClassName = { TEXT("UE"), ClassName, TEXT("Audio") };
                     Info.MajorVersion = 1;
                     Info.MinorVersion = 1;
-                    Info.DisplayName = METASOUND_LOCTEXT("_OPERATOR_NAME__DisplayName", "_OPERATOR_DISPLAYNAME_");
-                    Info.Description = METASOUND_LOCTEXT("_OPERATOR_NAME__Description", "_OPERATOR_DESCRIPTION_");
+                    Info.DisplayName = DisplayName;
+                    Info.Description = Description;
                     Info.Author = PluginAuthor;
                     Info.PromptIfMissing = PluginNodeMissingPrompt;
                     Info.DefaultInterface = GetVertexInterface();
-                    Info.CategoryHierarchy = { LOCTEXT("_OPERATOR_NAME__Category", "_OPERATOR_CATEGORY_") };
+                    Info.CategoryHierarchy = { Category };
                     return Info;
                 };
 
@@ -165,7 +174,8 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                 {
                     FInputVertexInterface inputs;
 
-                    for (auto& p: InputFloatParams()) {
+                    for (auto& it: InputFloatParams()) {
+                        auto& p = it.second;
                         inputs.Add(TInputDataVertex<float>(p.Name(), p.MetaData(), p.InitialValue()));
                     }
 
@@ -213,22 +223,53 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
                         //all params are handled in the audio thread
                         ParamInterface = CoreObject.createParameterInterface(RNBO::ParameterEventInterface::NotThreadSafe, nullptr);
+
+                        for (auto& it: InputFloatParams()) {
+                            mInputFloatParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, it.second.Name(), InSettings));
+                        }
+
+                        for (auto& p: InputAudioParams()) {
+                            mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<FAudioBuffer>(p.Name(), InSettings));
+                            mInputAudioBuffers.emplace_back(nullptr);
+                        }
+
+                        for (auto& p: OutputAudioParams()) {
+                            mOutputAudioParams.emplace_back(FAudioBufferWriteRef::CreateNew(InSettings));
+                            mOutputAudioBuffers.emplace_back(nullptr);
+                        }
                     }
 
 			virtual void BindInputs(FInputVertexInterfaceData& InOutVertexData) override
 			{
+                {
+                    auto lookup = InputFloatParams();
+                    for (auto& [index, p]: mInputFloatParams) {
+                        auto it = lookup.find(index);
+                        //should never fail
+                        if (it != lookup.end()) {
+                            InOutVertexData.BindReadVertex(it->second.Name(), p);
+                        }
+                    }
+                }
+                {
+                    auto lookup = InputAudioParams();
+                    for (size_t i = 0; i < mInputAudioParams.size(); i++) {
+                        auto& p = lookup[i];
+                        InOutVertexData.BindReadVertex(p.Name(), mInputAudioParams[i]);
+                    }
+                }
                 //TODO Transport
-                /*
-				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBPM), TransportBPM);
-				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportRun), TransportRun);
-				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportNum), TransportNum);
-				InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportDen), TransportDen);
-                */
 			}
 
 			virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
 			{
-				//InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransport), Transport);
+                {
+                    auto lookup = OutputAudioParams();
+                    for (size_t i = 0; i < mOutputAudioParams.size(); i++) {
+                        auto& p = lookup[i];
+                        InOutVertexData.BindReadVertex(p.Name(), mOutputAudioParams[i]);
+                    }
+                }
 			}
 
             void UpdateParam(RNBO::ParameterIndex i, float f) {

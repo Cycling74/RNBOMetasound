@@ -10,6 +10,7 @@ namespace _OPERATOR_NAME_
 	{
         const RNBO::Json desc = RNBO::Json::parse(_OPERATOR_DESC_);
 
+        /*
         static const std::vector<FRNBOMetasoundParam>& InputFloatParams() {
             static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
             return Params;
@@ -26,8 +27,10 @@ namespace _OPERATOR_NAME_
         }
 
 		_OPERATOR_PARAM_DECL_
+        */
 	}
 
+    /*
 	class F_OPERATOR_NAME_Operator : public TExecutableOperator<F_OPERATOR_NAME_Operator>
 	{
 		private:
@@ -199,10 +202,10 @@ namespace _OPERATOR_NAME_
 				CoreObject.process(ins.data(), ins.size(), outs.data(), outs.size(), NumFrames);
 			}
 	};
+*/
 
-    using _OPERATOR_NAME_Operator2 = FRNBOOperator<desc, RNBO::_OPERATOR_NAME_FactoryFunction>;
-
-    using _OPERATOR_NAME_Node = FGenericNode<F_OPERATOR_NAME_Operator>;
+    using _OPERATOR_NAME_Operator = FRNBOOperator<desc, RNBO::_OPERATOR_NAME_FactoryFunction>;
+    using _OPERATOR_NAME_Node = FGenericNode<_OPERATOR_NAME_Operator>;
 	METASOUND_REGISTER_NODE(_OPERATOR_NAME_Node)
 }
 
