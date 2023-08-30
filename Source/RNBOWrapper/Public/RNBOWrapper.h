@@ -12,6 +12,9 @@
 #include "MetasoundExecutableOperator.h"
 #include "MetasoundOperatorSettings.h"
 
+#include "MetasoundVertex.h"
+#include "RNBO.h"
+
 class FRNBOWrapperModule : public IModuleInterface
 {
 public:
