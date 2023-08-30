@@ -95,6 +95,8 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
         RNBO::CoreObject CoreObject;
         RNBO::ParameterEventInterfaceUniquePtr ParamInterface;
 
+        int32 mNumFrames;
+
         std::unordered_map<RNBO::ParameterIndex, FFloatReadRef> mInputFloatParams;
 
         std::vector<FAudioBufferReadRef> mInputAudioParams;
@@ -214,7 +216,8 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     const FInputVertexInterface& InputInterface,
                     FBuildErrorArray& OutErrors
                     ) :
-                CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())()))
+                CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())())),
+                mNumFrames(InSettings.GetNumFramesPerBlock())
 #if 0
                 , Transport(InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)))
 #endif
@@ -272,22 +275,18 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                 }
 			}
 
-            void UpdateParam(RNBO::ParameterIndex i, float f) {
-                double v = static_cast<double>(f);
-                if (v != ParamInterface->getParameterValue(i)) {
-                    ParamInterface->setParameterValue(i, v);
-                }
-            }
-
             void Execute()
             {
-                /*
-                const std::array<const float *, _OPERATOR_AUDIO_INPUT_COUNT_> ins = { _OPERATOR_AUDIO_INPUT_INIT_ };
-                std::array<float*, _OPERATOR_AUDIO_OUTPUT_COUNT_> outs = { _OPERATOR_AUDIO_OUTPUT_INIT_ };
+                //setup audio buffers
+                for (size_t i = 0; i < mInputAudioBuffers.size(); i++) {
+                    mInputAudioBuffers[i] = mInputAudioParams[i]->GetData();
+                }
 
-                int32 NumFrames = _OPERATOR_AUDIO_NUMFRAMES_MEMBER_->Num();
+                for (size_t i = 0; i < mOutputAudioBuffers.size(); i++) {
+                    mOutputAudioBuffers[i] = mOutputAudioParams[i]->GetData();
+                }
+
 #if 0
-
                 double btime = std::max(0.0, Transport->GetBeatTime().GetSeconds()); //not actually seconds
                 if (LastTransportBeatTime != btime)
                 { 
@@ -326,9 +325,14 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                 }
 #endif
 
-                _OPERATOR_PARAM_UPDATE_
-                    CoreObject.process(ins.data(), ins.size(), outs.data(), outs.size(), NumFrames);
-                    */
+                for (auto& [index, p]: mInputFloatParams) {
+                    double v = static_cast<double>(*p);
+                    if (v != ParamInterface->getParameterValue(index)) {
+                        ParamInterface->setParameterValue(index, v);
+                    }
+                }
+
+                CoreObject.process(static_cast<const float * const *>(mInputAudioBuffers.data()), mInputAudioBuffers.size(), mOutputAudioBuffers.data(), mOutputAudioBuffers.size(), mNumFrames);
             }
 };
 
