@@ -78,9 +78,6 @@ class FRNBOMetasoundParam {
 };
 
 
-//UNDO
-using namespace Metasound;
-
 #undef LOCTEXT_NAMESPACE
 #define LOCTEXT_NAMESPACE "FRNBOOperator"
 
@@ -94,12 +91,12 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
 
         int32 mNumFrames;
 
-        std::unordered_map<RNBO::ParameterIndex, FFloatReadRef> mInputFloatParams;
+        std::unordered_map<RNBO::ParameterIndex, Metasound::FFloatReadRef> mInputFloatParams;
 
-        std::vector<FAudioBufferReadRef> mInputAudioParams;
+        std::vector<Metasound::FAudioBufferReadRef> mInputAudioParams;
         std::vector<const float *> mInputAudioBuffers;
 
-        std::vector<FAudioBufferWriteRef> mOutputAudioParams;
+        std::vector<Metasound::FAudioBufferWriteRef> mOutputAudioParams;
         std::vector<float *> mOutputAudioBuffers;
 
         TOptional<FTransportReadRef> Transport;
@@ -131,8 +128,8 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
         }
 
     public:
-            static const FNodeClassMetadata& GetNodeInfo() {
-                auto InitNodeInfo = []() -> FNodeClassMetadata
+            static const Metasound::FNodeClassMetadata& GetNodeInfo() {
+                auto InitNodeInfo = []() -> Metasound::FNodeClassMetadata
                 {
                     auto meta = desc["meta"];
                     std::string classname = meta["rnboobjname"];
@@ -153,7 +150,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     FText Description = FText::AsCultureInvariant(description.c_str());
                     FText Category = FText::AsCultureInvariant(category.c_str());
 
-                    FNodeClassMetadata Info;
+                    Metasound::FNodeClassMetadata Info;
                     Info.ClassName = { TEXT("UE"), ClassName, TEXT("Audio") };
                     Info.MajorVersion = 1;
                     Info.MinorVersion = 1;
@@ -166,15 +163,15 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     return Info;
                 };
 
-                static const FNodeClassMetadata Info = InitNodeInfo();
+                static const Metasound::FNodeClassMetadata Info = InitNodeInfo();
 
                 return Info;
             }
 
-            static const FVertexInterface& GetVertexInterface() {
-                auto Init = []() -> FVertexInterface
+            static const Metasound::FVertexInterface& GetVertexInterface() {
+                auto Init = []() -> Metasound::FVertexInterface
                 {
-                    FInputVertexInterface inputs;
+                    Metasound::FInputVertexInterface inputs;
 
                     for (auto& it: InputFloatParams()) {
                         auto& p = it.second;
@@ -182,40 +179,40 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     }
 
                     if (WithTransport()) {
-                        inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
+                        inputs.Add(TInputDataVertex<Metasound::FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
                     }
 
                     for (auto& p: InputAudioParams()) {
-                        inputs.Add(TInputDataVertex<FAudioBuffer>(p.Name(), p.MetaData()));
+                        inputs.Add(TInputDataVertex<Metasound::FAudioBuffer>(p.Name(), p.MetaData()));
                     }
 
-                    FOutputVertexInterface outputs;
+                    Metasound::FOutputVertexInterface outputs;
 
                     for (auto& p: OutputAudioParams()) {
-                        outputs.Add(TOutputDataVertex<FAudioBuffer>(p.Name(), p.MetaData()));
+                        outputs.Add(TOutputDataVertex<Metasound::FAudioBuffer>(p.Name(), p.MetaData()));
                     }
 
-                    FVertexInterface interface(inputs, outputs);
+                    Metasound::FVertexInterface interface(inputs, outputs);
                     return interface;
                 };
-                static const FVertexInterface Interface = Init();
+                static const Metasound::FVertexInterface Interface = Init();
 
                 return Interface;
             }
 
-            static TUniquePtr<IOperator> CreateOperator(const FCreateOperatorParams& InParams, FBuildErrorArray& OutErrors) {
-                const FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
-                const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
+            static TUniquePtr<IOperator> CreateOperator(const Metasound::FCreateOperatorParams& InParams, Metasound::FBuildErrorArray& OutErrors) {
+                const Metasound::FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
+                const Metasound::FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
                 return MakeUnique<FRNBOOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutErrors);
             }
 
             FRNBOOperator(
-                    const FCreateOperatorParams& InParams,
-                    const FOperatorSettings& InSettings,
-                    const FDataReferenceCollection& InputCollection,
-                    const FInputVertexInterface& InputInterface,
-                    FBuildErrorArray& OutErrors
+                    const Metasound::FCreateOperatorParams& InParams,
+                    const Metasound::FOperatorSettings& InSettings,
+                    const Metasound::FDataReferenceCollection& InputCollection,
+                    const Metasound::FInputVertexInterface& InputInterface,
+                    Metasound::FBuildErrorArray& OutErrors
                     ) :
                 CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())())),
                 mNumFrames(InSettings.GetNumFramesPerBlock())
@@ -230,12 +227,12 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         }
 
                         for (auto& p: InputAudioParams()) {
-                            mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<FAudioBuffer>(p.Name(), InSettings));
+                            mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FAudioBuffer>(p.Name(), InSettings));
                             mInputAudioBuffers.emplace_back(nullptr);
                         }
 
                         for (auto& p: OutputAudioParams()) {
-                            mOutputAudioParams.emplace_back(FAudioBufferWriteRef::CreateNew(InSettings));
+                            mOutputAudioParams.emplace_back(Metasound::FAudioBufferWriteRef::CreateNew(InSettings));
                             mOutputAudioBuffers.emplace_back(nullptr);
                         }
                         if (WithTransport()) {
@@ -243,8 +240,8 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         }
                     }
 
-			virtual void BindInputs(FInputVertexInterfaceData& InOutVertexData) override
-			{
+            virtual void BindInputs(Metasound::FInputVertexInterfaceData& InOutVertexData) override
+            {
                 {
                     auto lookup = InputFloatParams();
                     for (auto& [index, p]: mInputFloatParams) {
@@ -265,10 +262,10 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         InOutVertexData.BindReadVertex(p.Name(), mInputAudioParams[i]);
                     }
                 }
-			}
+            }
 
-			virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
-			{
+            virtual void BindOutputs(Metasound::FOutputVertexInterfaceData& InOutVertexData) override
+            {
                 {
                     auto lookup = OutputAudioParams();
                     for (size_t i = 0; i < mOutputAudioParams.size(); i++) {
@@ -276,7 +273,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         InOutVertexData.BindReadVertex(p.Name(), mOutputAudioParams[i]);
                     }
                 }
-			}
+            }
 
             void Execute()
             {
