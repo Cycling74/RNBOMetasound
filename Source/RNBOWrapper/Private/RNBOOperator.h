@@ -85,10 +85,7 @@ using namespace Metasound;
 #define LOCTEXT_NAMESPACE "FRNBOOperator"
 
 //https://en.cppreference.com/w/cpp/language/template_parameters
-template<
-const RNBO::Json& desc,
-RNBO::PatcherFactoryFunctionPtr(*FactoryFunction)(RNBO::PlatformInterface* platformInterface)
->
+template<const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr(*FactoryFunction)(RNBO::PlatformInterface* platformInterface)>
 class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>
 {
     private:
@@ -105,30 +102,33 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
         std::vector<FAudioBufferWriteRef> mOutputAudioParams;
         std::vector<float *> mOutputAudioBuffers;
 
-#if 0
-        FTransportReadRef Transport;
+        TOptional<FTransportReadRef> Transport;
 
         double LastTransportBeatTime = -1.0;
         float LastTransportBPM = 0.0f;
         bool LastTransportRun = false;
         int32 LastTransportNum = 0;
         int32 LastTransportDen = 0;
-#endif
 
-    static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputFloatParams() {
-        static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
-        return Params;
-    }
+        static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputFloatParams() {
+            static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
+            return Params;
+        }
 
-    static const std::vector<FRNBOMetasoundParam>& InputAudioParams() {
-        static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputAudio(desc);
-        return Params;
-    }
+        static const std::vector<FRNBOMetasoundParam>& InputAudioParams() {
+            static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputAudio(desc);
+            return Params;
+        }
 
-    static const std::vector<FRNBOMetasoundParam>& OutputAudioParams() {
-        static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::OutputAudio(desc);
-        return Params;
-    }
+        static const std::vector<FRNBOMetasoundParam>& OutputAudioParams() {
+            static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::OutputAudio(desc);
+            return Params;
+        }
+
+        static const bool WithTransport() {
+            //TODO config based on description
+            return true;
+        }
 
     public:
             static const FNodeClassMetadata& GetNodeInfo() {
@@ -181,13 +181,14 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         inputs.Add(TInputDataVertex<float>(p.Name(), p.MetaData(), p.InitialValue()));
                     }
 
+                    if (WithTransport()) {
+                        inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
+                    }
+
                     for (auto& p: InputAudioParams()) {
                         inputs.Add(TInputDataVertex<FAudioBuffer>(p.Name(), p.MetaData()));
                     }
 
-#if 0
-                    inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
-#endif
                     FOutputVertexInterface outputs;
 
                     for (auto& p: OutputAudioParams()) {
@@ -218,9 +219,6 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     ) :
                 CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())())),
                 mNumFrames(InSettings.GetNumFramesPerBlock())
-#if 0
-                , Transport(InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)))
-#endif
 
                     {
                         CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
@@ -240,6 +238,9 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                             mOutputAudioParams.emplace_back(FAudioBufferWriteRef::CreateNew(InSettings));
                             mOutputAudioBuffers.emplace_back(nullptr);
                         }
+                        if (WithTransport()) {
+                            Transport = {InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport))};
+                        }
                     }
 
 			virtual void BindInputs(FInputVertexInterfaceData& InOutVertexData) override
@@ -254,6 +255,9 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         }
                     }
                 }
+                if (Transport.IsSet()) {
+                    InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransport), Transport.GetValue());
+                }
                 {
                     auto lookup = InputAudioParams();
                     for (size_t i = 0; i < mInputAudioParams.size(); i++) {
@@ -261,7 +265,6 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         InOutVertexData.BindReadVertex(p.Name(), mInputAudioParams[i]);
                     }
                 }
-                //TODO Transport
 			}
 
 			virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
@@ -286,44 +289,45 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     mOutputAudioBuffers[i] = mOutputAudioParams[i]->GetData();
                 }
 
-#if 0
-                double btime = std::max(0.0, Transport->GetBeatTime().GetSeconds()); //not actually seconds
-                if (LastTransportBeatTime != btime)
-                { 
-                    LastTransportBeatTime = btime;
-                    RNBO::BeatTimeEvent event(0, btime);
+                if (Transport.IsSet()) {
+                    auto& transport = Transport.GetValue();
+                    double btime = std::max(0.0, transport->GetBeatTime().GetSeconds()); //not actually seconds
+                    if (LastTransportBeatTime != btime)
+                    { 
+                        LastTransportBeatTime = btime;
+                        RNBO::BeatTimeEvent event(0, btime);
 
-                    ParamInterface->scheduleEvent(event);
+                        ParamInterface->scheduleEvent(event);
+                    }
+
+                    float bpm = std::max(0.0f, transport->GetBPM());
+                    if (LastTransportBPM != bpm)
+                    { 
+                        LastTransportBPM = bpm;
+
+                        RNBO::TempoEvent event(0, bpm);
+                        ParamInterface->scheduleEvent(event);
+                    }
+
+                    if (LastTransportRun != transport->GetRun())
+                    { 
+                        LastTransportRun = transport->GetRun();
+                        RNBO::TransportEvent event(0, LastTransportRun ? RNBO::TransportState::RUNNING : RNBO::TransportState::STOPPED);
+                        ParamInterface->scheduleEvent(event);
+                    }
+
+                    auto timesig = transport->GetTimeSig();
+                    auto num = std::get<0>(timesig);
+                    auto den = std::get<1>(timesig);
+                    if (LastTransportNum != num || LastTransportDen != den)
+                    { 
+                        LastTransportNum = num;
+                        LastTransportDen = den;
+
+                        RNBO::TimeSignatureEvent event(0, num, den);
+                        ParamInterface->scheduleEvent(event);
+                    }
                 }
-
-                float bpm = std::max(0.0f, Transport->GetBPM());
-                if (LastTransportBPM != bpm)
-                { 
-                    LastTransportBPM = bpm;
-
-                    RNBO::TempoEvent event(0, bpm);
-                    ParamInterface->scheduleEvent(event);
-                }
-
-                if (LastTransportRun != Transport->GetRun())
-                { 
-                    LastTransportRun = Transport->GetRun();
-                    RNBO::TransportEvent event(0, LastTransportRun ? RNBO::TransportState::RUNNING : RNBO::TransportState::STOPPED);
-                    ParamInterface->scheduleEvent(event);
-                }
-
-                auto timesig = Transport->GetTimeSig();
-                auto num = std::get<0>(timesig);
-                auto den = std::get<1>(timesig);
-                if (LastTransportNum != num || LastTransportDen != den)
-                { 
-                    LastTransportNum = num;
-                    LastTransportDen = den;
-
-                    RNBO::TimeSignatureEvent event(0, num, den);
-                    ParamInterface->scheduleEvent(event);
-                }
-#endif
 
                 for (auto& [index, p]: mInputFloatParams) {
                     double v = static_cast<double>(*p);
