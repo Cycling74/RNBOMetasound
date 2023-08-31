@@ -30,6 +30,14 @@ class FRNBOMetasoundParam {
             std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> params;
 
             for (auto& p: desc["parameters"]) {
+                if (p["type"].get<std::string>().compare("ParameterTypeNumber") != 0) {
+                    continue;
+                }
+
+                if (p.contains("visible") && p["visible"].get<bool>() == false) {
+                    continue;
+                }
+
                 RNBO::ParameterIndex index = static_cast<RNBO::ParameterIndex>(p["index"].get<int>());
                 std::string name = p["name"].get<std::string>();
                 std::string displayName = p["displayName"].get<std::string>();
@@ -48,6 +56,7 @@ class FRNBOMetasoundParam {
         }
 
         static std::vector<FRNBOMetasoundParam> InputAudio(const RNBO::Json& desc) {
+            //TODO param~
             return Signals(desc, "inlets");
         }
 
