@@ -5,6 +5,7 @@
 
 #include "RNBOMetasound.h"
 #include "RNBO.h"
+#include "RNBO_TimeConverter.h"
 #include "MetasoundPrimitives.h"
 #include "Internationalization/Text.h"
 #include <unordered_map>
@@ -58,6 +59,31 @@ class FRNBOMetasoundParam {
             return params;
         }
 
+        static std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> InportTrig(const RNBO::Json& desc) {
+            std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> params;
+            for (auto& p: desc["inports"]) {
+              std::string tag = p["tag"];
+              std::string description = tag;
+              std::string displayName = tag;
+              if (p.contains("meta")) {
+                //TODO get description and display name
+                
+                //TODO
+                /*
+                if (p["meta"].contains("trigger") && p["meta"]["trigger"].is_bool() && p["meta"]["trigger"].get<bool>()) {
+                }
+                */
+              }
+              RNBO::MessageTag id = RNBO::TAG(tag.c_str());
+                params.emplace(
+                        id, 
+                        FRNBOMetasoundParam(FString(tag.c_str()), FText::AsCultureInvariant(description.c_str()), FText::AsCultureInvariant(displayName.c_str()))
+                        );
+            }
+
+            return params;
+        }
+
         static std::vector<FRNBOMetasoundParam> InputAudio(const RNBO::Json& desc) {
             //TODO param~
             return Signals(desc, "inlets");
@@ -104,6 +130,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
         int32 mNumFrames;
 
         std::unordered_map<RNBO::ParameterIndex, Metasound::FFloatReadRef> mInputFloatParams;
+        std::unordered_map<RNBO::MessageTag, Metasound::FTriggerReadRef> mInportTriggerParams;
 
         std::vector<Metasound::FAudioBufferReadRef> mInputAudioParams;
         std::vector<const float *> mInputAudioBuffers;
@@ -121,6 +148,11 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
 
         static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputFloatParams() {
             static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
+            return Params;
+        }
+
+        static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam>& InportTrig() {
+            static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InportTrig(desc);
             return Params;
         }
 
@@ -185,6 +217,11 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                 {
                     Metasound::FInputVertexInterface inputs;
 
+                    for (auto& it: InportTrig()) {
+                        auto& p = it.second;
+                        inputs.Add(TInputDataVertex<Metasound::FTrigger>(p.Name(), p.MetaData()));
+                    }
+
                     for (auto& it: InputFloatParams()) {
                         auto& p = it.second;
                         inputs.Add(TInputDataVertex<float>(p.Name(), p.MetaData(), p.InitialValue()));
@@ -234,6 +271,10 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         //all params are handled in the audio thread
                         ParamInterface = CoreObject.createParameterInterface(RNBO::ParameterEventInterface::NotThreadSafe, nullptr);
 
+                        for (auto& it: InportTrig()) {
+                            mInportTriggerParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstruct<Metasound::FTrigger>(it.second.Name(), InSettings));
+                        }
+
                         for (auto& it: InputFloatParams()) {
                             mInputFloatParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, it.second.Name(), InSettings));
                         }
@@ -254,6 +295,17 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
 
             virtual void BindInputs(Metasound::FInputVertexInterfaceData& InOutVertexData) override
             {
+                {
+                    auto lookup = InportTrig();
+                    for (auto& [index, p]: mInportTriggerParams) {
+                        auto it = lookup.find(index);
+                        //should never fail
+                        if (it != lookup.end()) {
+                            InOutVertexData.BindReadVertex(it->second.Name(), p);
+                        }
+                    }
+                }
+
                 {
                     auto lookup = InputFloatParams();
                     for (auto& [index, p]: mInputFloatParams) {
@@ -336,6 +388,16 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         RNBO::TimeSignatureEvent event(0, num, den);
                         ParamInterface->scheduleEvent(event);
                     }
+                }
+
+                {
+                  RNBO::TimeConverter converter(CoreObject.getSampleRate(), CoreObject.getCurrentTime());
+                  for (auto& [tag, p]: mInportTriggerParams) {
+                    for (int32 i = 0; i < p->NumTriggeredInBlock(); i++) {
+                      auto frame = (*p)[i];
+                      ParamInterface->sendMessage(tag, 0, converter.convertSampleOffsetToMilliseconds(static_cast<RNBO::SampleOffset>(frame)));
+                    }
+                  }
                 }
 
                 for (auto& [index, p]: mInputFloatParams) {
