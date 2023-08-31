@@ -43,8 +43,7 @@ namespace RNBOWrapper {
 }
 
 namespace Metasound {
-  //TODO  METASOUNDFRONTEND_API ?
-	class METASOUNDFRONTEND_API FTransport {
+	class RNBOWRAPPER_API FTransport {
 		public:
 			FTransport(bool bRun = true, float bBPM = 120.0, int32 bTimeSigNum = 4, int32 bTimeSigDen = 4) : 
 				BeatTime(0.0),
@@ -72,7 +71,6 @@ namespace Metasound {
 			float BPM = 120.0f;
 			std::tuple<int32, int32> TimeSig;
   };
-  //XXX what about the METASOUNDFRONTEND_API ?
-	DECLARE_METASOUND_DATA_REFERENCE_TYPES(FTransport, METASOUNDFRONTEND_API, FTransportTypeInfo, FTransportReadRef, FTransportWriteRef);
+	DECLARE_METASOUND_DATA_REFERENCE_TYPES(FTransport, RNBOWRAPPER_API, FTransportTypeInfo, FTransportReadRef, FTransportWriteRef);
 }
 

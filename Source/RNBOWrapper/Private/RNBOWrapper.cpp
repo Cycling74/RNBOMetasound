@@ -50,8 +50,8 @@ namespace Metasound {
 		static constexpr bool Value = false;
 	};
 
-  REGISTER_METASOUND_DATATYPE(FTransport, "Transport", ::Metasound::ELiteralType::Boolean)
 }
+REGISTER_METASOUND_DATATYPE(Metasound::FTransport, "Transport", ::Metasound::ELiteralType::Boolean)
 
 namespace 
 {
