@@ -84,6 +84,31 @@ class FRNBOMetasoundParam {
             return params;
         }
 
+        static std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> OutportTrig(const RNBO::Json& desc) {
+            std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> params;
+            for (auto& p: desc["outports"]) {
+              std::string tag = p["tag"];
+              std::string description = tag;
+              std::string displayName = tag;
+              if (p.contains("meta")) {
+                //TODO get description and display name
+                
+                //TODO
+                /*
+                if (p["meta"].contains("trigger") && p["meta"]["trigger"].is_bool() && p["meta"]["trigger"].get<bool>()) {
+                }
+                */
+              }
+              RNBO::MessageTag id = RNBO::TAG(tag.c_str());
+                params.emplace(
+                        id, 
+                        FRNBOMetasoundParam(FString(tag.c_str()), FText::AsCultureInvariant(description.c_str()), FText::AsCultureInvariant(displayName.c_str()))
+                        );
+            }
+
+            return params;
+        }
+
         static std::vector<FRNBOMetasoundParam> InputAudio(const RNBO::Json& desc) {
             //TODO param~
             return Signals(desc, "inlets");
@@ -121,10 +146,11 @@ class FRNBOMetasoundParam {
 
 //https://en.cppreference.com/w/cpp/language/template_parameters
 template<const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr(*FactoryFunction)(RNBO::PlatformInterface* platformInterface)>
-class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>
+class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>, public RNBO::EventHandler
 {
     private:
         RNBO::CoreObject CoreObject;
+        RNBO::TimeConverter Converter = RNBO::TimeConverter(44100.0, 0.0);
         RNBO::ParameterEventInterfaceUniquePtr ParamInterface;
 
         int32 mNumFrames;
@@ -135,6 +161,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
         std::vector<Metasound::FAudioBufferReadRef> mInputAudioParams;
         std::vector<const float *> mInputAudioBuffers;
 
+        std::unordered_map<RNBO::MessageTag, Metasound::FTriggerWriteRef> mOutportTriggerParams;
         std::vector<Metasound::FAudioBufferWriteRef> mOutputAudioParams;
         std::vector<float *> mOutputAudioBuffers;
 
@@ -158,6 +185,11 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
 
         static const std::vector<FRNBOMetasoundParam>& InputAudioParams() {
             static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputAudio(desc);
+            return Params;
+        }
+
+        static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam>& OutportTrig() {
+            static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::OutportTrig(desc);
             return Params;
         }
 
@@ -237,6 +269,11 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
 
                     Metasound::FOutputVertexInterface outputs;
 
+                    for (auto& it: OutportTrig()) {
+                        auto& p = it.second;
+                        outputs.Add(TOutputDataVertex<Metasound::FTrigger>(p.Name(), p.MetaData()));
+                    }
+
                     for (auto& p: OutputAudioParams()) {
                         outputs.Add(TOutputDataVertex<Metasound::FAudioBuffer>(p.Name(), p.MetaData()));
                     }
@@ -269,7 +306,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     {
                         CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
                         //all params are handled in the audio thread
-                        ParamInterface = CoreObject.createParameterInterface(RNBO::ParameterEventInterface::NotThreadSafe, nullptr);
+                        ParamInterface = CoreObject.createParameterInterface(RNBO::ParameterEventInterface::NotThreadSafe, this);
 
                         for (auto& it: InportTrig()) {
                             mInportTriggerParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstruct<Metasound::FTrigger>(it.second.Name(), InSettings));
@@ -282,6 +319,10 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         for (auto& p: InputAudioParams()) {
                             mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FAudioBuffer>(p.Name(), InSettings));
                             mInputAudioBuffers.emplace_back(nullptr);
+                        }
+
+                        for (auto& it: OutportTrig()) {
+                            mOutportTriggerParams.emplace(it.first, Metasound::FTriggerWriteRef::CreateNew(InSettings));
                         }
 
                         for (auto& p: OutputAudioParams()) {
@@ -331,6 +372,17 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
             virtual void BindOutputs(Metasound::FOutputVertexInterfaceData& InOutVertexData) override
             {
                 {
+                    auto lookup = OutportTrig();
+                    for (auto& [index, p]: mOutportTriggerParams) {
+                        auto it = lookup.find(index);
+                        //should never fail
+                        if (it != lookup.end()) {
+                            InOutVertexData.BindReadVertex(it->second.Name(), p);
+                        }
+                    }
+                }
+
+                {
                     auto lookup = OutputAudioParams();
                     for (size_t i = 0; i < mOutputAudioParams.size(); i++) {
                         auto& p = lookup[i];
@@ -341,6 +393,13 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
 
             void Execute()
             {
+                Converter = { CoreObject.getSampleRate(), CoreObject.getCurrentTime() };
+
+                //update outport triggers
+                for (auto it: mOutportTriggerParams) {
+                    it.second->AdvanceBlock();
+                }
+
                 //setup audio buffers
                 for (size_t i = 0; i < mInputAudioBuffers.size(); i++) {
                     mInputAudioBuffers[i] = mInputAudioParams[i]->GetData();
@@ -391,13 +450,12 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                 }
 
                 {
-                  RNBO::TimeConverter converter(CoreObject.getSampleRate(), CoreObject.getCurrentTime());
-                  for (auto& [tag, p]: mInportTriggerParams) {
-                    for (int32 i = 0; i < p->NumTriggeredInBlock(); i++) {
-                      auto frame = (*p)[i];
-                      ParamInterface->sendMessage(tag, 0, converter.convertSampleOffsetToMilliseconds(static_cast<RNBO::SampleOffset>(frame)));
+                    for (auto& [tag, p]: mInportTriggerParams) {
+                        for (int32 i = 0; i < p->NumTriggeredInBlock(); i++) {
+                            auto frame = (*p)[i];
+                            ParamInterface->sendMessage(tag, 0, Converter.convertSampleOffsetToMilliseconds(static_cast<RNBO::SampleOffset>(frame)));
+                        }
                     }
-                  }
                 }
 
                 for (auto& [index, p]: mInputFloatParams) {
@@ -408,6 +466,35 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                 }
 
                 CoreObject.process(static_cast<const float * const *>(mInputAudioBuffers.data()), mInputAudioBuffers.size(), mOutputAudioBuffers.data(), mOutputAudioBuffers.size(), mNumFrames);
+            }
+
+            //does this ever get called?
+            void Reset(const Metasound::IOperator::FResetParams& InParams)
+            {
+                for (auto it: mOutportTriggerParams) {
+                    it.second->Reset();
+                }
+            }
+
+            virtual void eventsAvailable() {  
+                drainEvents();
+            }
+            
+            virtual void handleMessageEvent(const RNBO::MessageEvent& event) override { 
+                switch (event.getType()) {
+                    case RNBO::MessageEvent::Type::Bang: 
+                        {
+                            auto it = mOutportTriggerParams.find(event.getTag());
+                            if (it != mOutportTriggerParams.end()) {
+                                RNBO::SampleOffset frame = Converter.convertMillisecondsToSampleOffset(event.getTime());
+                                it->second->TriggerFrame(static_cast<int32>(frame));
+                            }
+                        }
+                        break;
+                    default:
+                        //TODO
+                        break;
+                }
             }
 };
 
