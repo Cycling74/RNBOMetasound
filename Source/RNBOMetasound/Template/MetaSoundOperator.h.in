@@ -8,7 +8,7 @@
 #include "DSP/Delay.h"
 #include "MetasoundStandardNodesCategories.h"
 #include "MetasoundFacade.h"
-#include "RNBOWrapper.h"
+#include "RNBOMetasound.h"
 #include "RNBOOperator.h"
 
 //visual studio warnings we're having trouble with

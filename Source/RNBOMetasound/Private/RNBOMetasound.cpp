@@ -1,20 +1,20 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "RNBOWrapper.h"
+#include "RNBOMetasound.h"
 #include "MetasoundFrontendRegistries.h"
 #include "MetasoundSampleCounter.h"
 
 #include "MetasoundDataTypeRegistrationMacro.h"
 
-#define LOCTEXT_NAMESPACE "FRNBOWrapperModule"
+#define LOCTEXT_NAMESPACE "FRNBOMetasoundModule"
 
-void FRNBOWrapperModule::StartupModule()
+void FRNBOMetasoundModule::StartupModule()
 {
 	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
     FMetasoundFrontendRegistryContainer::Get()->RegisterPendingNodes();
 }
 
-void FRNBOWrapperModule::ShutdownModule()
+void FRNBOMetasoundModule::ShutdownModule()
 {
 	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
 	// we call this function before unloading the module.
@@ -56,7 +56,7 @@ REGISTER_METASOUND_DATATYPE(Metasound::FTransport, "Transport", ::Metasound::ELi
 namespace 
 {
 	using namespace Metasound;
-	using namespace RNBOWrapper;
+	using namespace RNBOMetasound;
 
 	namespace {
 		METASOUND_PARAM(ParamTransportBPM, "BPM", "The tempo of the transport in beats per minute.")
@@ -184,4 +184,4 @@ namespace
 
 #undef LOCTEXT_NAMESPACE
 
-IMPLEMENT_MODULE(FRNBOWrapperModule, RNBOWrapper)
+IMPLEMENT_MODULE(FRNBOMetasoundModule, RNBOMetasound)

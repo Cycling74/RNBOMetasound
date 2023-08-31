@@ -3,7 +3,7 @@
 //visual studio warnings we're having trouble with
 #pragma warning ( disable : 4800 4065 4668 4804 4018 4060 4554 4018 )
 
-#include "RNBOWrapper.h"
+#include "RNBOMetasound.h"
 #include "RNBO.h"
 #include "MetasoundPrimitives.h"
 #include "Internationalization/Text.h"

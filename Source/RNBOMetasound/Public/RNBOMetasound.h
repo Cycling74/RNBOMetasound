@@ -18,7 +18,7 @@
 #pragma warning ( disable : 4800 4065 4668 4804 4018 4060 4554 4018 )
 #include "RNBO.h"
 
-class FRNBOWrapperModule : public IModuleInterface
+class FRNBOMetasoundModule : public IModuleInterface
 {
 public:
 	/** IModuleInterface implementation */
@@ -26,7 +26,7 @@ public:
 	virtual void ShutdownModule() override;
 };
 
-namespace RNBOWrapper {
+namespace RNBOMetasound {
   template <class Op>
 		class FGenericNode : public Metasound::FNodeFacade
 	{
@@ -40,13 +40,13 @@ namespace RNBOWrapper {
 			}
   };
 
-#define LOCTEXT_NAMESPACE "FRNBOWrapperModule"
+#define LOCTEXT_NAMESPACE "FRNBOMetasoundModule"
 		METASOUND_PARAM(ParamTransport, "Transport", "The transport.")
 #undef LOCTEXT_NAMESPACE
 }
 
 namespace Metasound {
-	class RNBOWRAPPER_API FTransport {
+	class RNBOMETASOUND_API FTransport {
 		public:
 			FTransport(bool bRun = true, float bBPM = 120.0, int32 bTimeSigNum = 4, int32 bTimeSigDen = 4) : 
 				BeatTime(0.0),
@@ -74,6 +74,6 @@ namespace Metasound {
 			float BPM = 120.0f;
 			std::tuple<int32, int32> TimeSig;
   };
-	DECLARE_METASOUND_DATA_REFERENCE_TYPES(FTransport, RNBOWRAPPER_API, FTransportTypeInfo, FTransportReadRef, FTransportWriteRef);
+	DECLARE_METASOUND_DATA_REFERENCE_TYPES(FTransport, RNBOMETASOUND_API, FTransportTypeInfo, FTransportReadRef, FTransportWriteRef);
 }
 

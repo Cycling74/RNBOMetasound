@@ -2,7 +2,7 @@
 namespace _OPERATOR_NAME_
 {
 	using namespace Metasound;
-	using namespace RNBOWrapper;
+	using namespace RNBOMetasound;
 
 	namespace 
 	{
