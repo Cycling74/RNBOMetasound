@@ -8,6 +8,9 @@
 
 ## Notes
 
+* When exporting your RNBO C++ source, you can pick an export directory that should have a path like: `/<Your UE Project>/Plugins/RNBOMetasound/Exports/<Your RNBO Device Name>/`
+
 * to recompile/load metasound nodes:
   * Tools -> Debug -> Modules
     * search for RNBO then click the appropriate button
+    * note: you must have "Live Coding" disabled 
