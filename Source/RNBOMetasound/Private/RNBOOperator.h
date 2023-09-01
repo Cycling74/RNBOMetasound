@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RNBONode.h"
+#include "RNBOMIDI.h"
 #include "RNBOTransport.h"
 
 // visual studio warnings we're having trouble with
@@ -16,6 +17,11 @@
 #include <unordered_map>
 
 namespace RNBOMetasound {
+
+#define LOCTEXT_NAMESPACE "FRNBOMetasoundModule"
+METASOUND_PARAM(ParamMIDIIn, "MIDI In", "MIDI data input.")
+METASOUND_PARAM(ParamMIDIOut, "MIDI Out", "MIDI data output.")
+#undef LOCTEXT_NAMESPACE
 
 using Metasound::FDataVertexMetadata;
 
@@ -136,6 +142,16 @@ class FRNBOMetasoundParam
         return Signals(desc, "outlets");
     }
 
+    static bool MIDIIn(const RNBO::Json& desc)
+    {
+        return desc["numMidiInputPorts"].get<int>() > 0;
+    }
+
+    static bool MIDIOut(const RNBO::Json& desc)
+    {
+        return desc["numMidiOutputPorts"].get<int>() > 0;
+    }
+
   private:
     static std::vector<FRNBOMetasoundParam> Signals(const RNBO::Json& desc, std::string selector)
     {
@@ -185,6 +201,9 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
     TOptional<FTransportReadRef> Transport;
 
+    TOptional<FMIDIBufferReadRef> MIDIIn;
+    TOptional<FMIDIBufferWriteRef> MIDIOut;
+
     double LastTransportBeatTime = -1.0;
     float LastTransportBPM = 0.0f;
     bool LastTransportRun = false;
@@ -225,6 +244,18 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     {
         // TODO config based on description
         return true;
+    }
+
+    static const bool WithMIDIIn()
+    {
+        static const bool v = FRNBOMetasoundParam::FRNBOMetasoundParam::MIDIIn(desc);
+        return v;
+    }
+
+    static const bool WithMIDIOut()
+    {
+        static const bool v = FRNBOMetasoundParam::FRNBOMetasoundParam::MIDIOut(desc);
+        return v;
     }
 
   public:
@@ -281,6 +312,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                 inputs.Add(TInputDataVertex<Metasound::FTrigger>(p.Name(), p.MetaData()));
             }
 
+            if (WithMIDIIn()) {
+                inputs.Add(TInputDataVertex<FMIDIBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamMIDIIn)));
+            }
+
             for (auto& it : InputFloatParams()) {
                 auto& p = it.second;
                 inputs.Add(TInputDataVertex<float>(p.Name(), p.MetaData(), p.InitialValue()));
@@ -299,6 +334,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             for (auto& it : OutportTrig()) {
                 auto& p = it.second;
                 outputs.Add(TOutputDataVertex<Metasound::FTrigger>(p.Name(), p.MetaData()));
+            }
+
+            if (WithMIDIOut()) {
+                outputs.Add(TOutputDataVertex<FMIDIBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamMIDIOut)));
             }
 
             for (auto& p : OutputAudioParams()) {
@@ -339,6 +378,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             mInportTriggerParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstruct<Metasound::FTrigger>(it.second.Name(), InSettings));
         }
 
+        if (WithMIDIIn()) {
+            MIDIIn = { InputCollection.GetDataReadReferenceOrConstruct<FMIDIBuffer>(METASOUND_GET_PARAM_NAME(ParamMIDIIn), InSettings) };
+        }
+
         for (auto& it : InputFloatParams()) {
             mInputFloatParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, it.second.Name(), InSettings));
         }
@@ -350,6 +393,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
         for (auto& it : OutportTrig()) {
             mOutportTriggerParams.emplace(it.first, Metasound::FTriggerWriteRef::CreateNew(InSettings));
+        }
+
+        if (WithMIDIOut()) {
+            MIDIOut = FMIDIBufferWriteRef::CreateNew(InSettings);
         }
 
         for (auto& p : OutputAudioParams()) {
@@ -372,6 +419,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                     InOutVertexData.BindReadVertex(it->second.Name(), p);
                 }
             }
+        }
+
+        if (MIDIIn.IsSet()) {
+            InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamMIDIIn), MIDIIn.GetValue());
         }
 
         {
@@ -409,6 +460,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             }
         }
 
+        if (MIDIOut.IsSet()) {
+            InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamMIDIOut), MIDIOut.GetValue());
+        }
+
         {
             auto lookup = OutputAudioParams();
             for (size_t i = 0; i < mOutputAudioParams.size(); i++) {
@@ -422,6 +477,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     {
         Converter = { CoreObject.getSampleRate(), CoreObject.getCurrentTime() };
 
+        if (MIDIOut.IsSet()) {
+            MIDIOut.GetValue()->AdvanceBlock();
+        }
+
         // update outport triggers
         for (auto it : mOutportTriggerParams) {
             it.second->AdvanceBlock();
@@ -434,6 +493,18 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
         for (size_t i = 0; i < mOutputAudioBuffers.size(); i++) {
             mOutputAudioBuffers[i] = mOutputAudioParams[i]->GetData();
+        }
+
+        if (MIDIIn.IsSet()) {
+            auto& midiin = MIDIIn.GetValue();
+            const int32 num = midiin->NumInBlock();
+            for (int32 i = 0; i < num; i++) {
+                const auto& e = (*midiin)[i];
+                auto ms = Converter.convertSampleOffsetToMilliseconds(static_cast<RNBO::SampleOffset>(e.Frame()));
+
+                RNBO::MidiEvent event(ms, 0, e.Data().data(), e.Length());
+                ParamInterface->scheduleEvent(event);
+            }
         }
 
         if (Transport.IsSet()) {
@@ -523,6 +594,16 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                 // TODO
                 break;
         }
+    }
+
+    virtual void handleMidiEvent(const RNBO::MidiEvent& event) override
+    {
+        if (!MIDIOut.IsSet()) {
+            return;
+        }
+        RNBO::SampleOffset frame = Converter.convertMillisecondsToSampleOffset(event.getTime());
+        FMIDIPacket packet(frame, event.getLength(), event.getData());
+        MIDIOut.GetValue()->Push(packet);
     }
 };
 } // namespace RNBOMetasound
