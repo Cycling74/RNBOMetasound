@@ -1,209 +1,218 @@
 #pragma once
 
+#include "RNBONode.h"
+#include "RNBOTransport.h"
+
 //visual studio warnings we're having trouble with
 #pragma warning ( disable : 4800 4065 4668 4804 4018 4060 4554 4018 )
-
-#include "RNBOMetasound.h"
 #include "RNBO.h"
 #include "RNBO_TimeConverter.h"
+
 #include "MetasoundPrimitives.h"
+#include "MetasoundParamHelper.h"
+#include "MetasoundVertex.h"
+
 #include "Internationalization/Text.h"
 #include <unordered_map>
 
-class FRNBOMetasoundParam {
-    public:
-        FRNBOMetasoundParam(const FString name, const FText tooltip, const FText displayName, float initialValue = 0.0f) :
-            mName(name), mInitialValue(initialValue),
+namespace RNBOMetasound {
+
+    using Metasound::FDataVertexMetadata;
+
+    class FRNBOMetasoundParam {
+        public:
+            FRNBOMetasoundParam(const FString name, const FText tooltip, const FText displayName, float initialValue = 0.0f) :
+                mName(name), mInitialValue(initialValue),
 #if WITH_EDITOR
-            mTooltip(tooltip), mDisplayName(displayName)
+                mTooltip(tooltip), mDisplayName(displayName)
 #else
-                mTooltip(FText::GetEmpty()), mDisplayName(FText::GetEmpty())
+                    mTooltip(FText::GetEmpty()), mDisplayName(FText::GetEmpty())
 #endif
-                {}
+                    {}
 
-        FDataVertexMetadata MetaData() const {
-            return { Tooltip(), DisplayName() };
-        }
-
-        const TCHAR * Name() const { return mName.GetCharArray().GetData(); }
-        const FText Tooltip() const { return mTooltip; }
-        const FText DisplayName() const { return mDisplayName; }
-        float InitialValue() const { return mInitialValue; }
-
-        static std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> InputFloat(const RNBO::Json& desc) {
-            std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> params;
-
-            for (auto& p: desc["parameters"]) {
-                if (p["type"].get<std::string>().compare("ParameterTypeNumber") != 0) {
-                    continue;
-                }
-
-                if (p.contains("visible") && p["visible"].get<bool>() == false) {
-                    continue;
-                }
-
-                RNBO::ParameterIndex index = static_cast<RNBO::ParameterIndex>(p["index"].get<int>());
-                std::string name = p["name"].get<std::string>();
-                std::string displayName = p["displayName"].get<std::string>();
-                std::string id = p["paramId"].get<std::string>();
-                float initialValue = p["initialValue"].get<float>();
-                if (displayName.size() == 0) {
-                    displayName = name;
-                }
-                params.emplace(
-                        index, 
-                        FRNBOMetasoundParam(FString(name.c_str()), FText::AsCultureInvariant(id.c_str()), FText::AsCultureInvariant(displayName.c_str()), initialValue)
-                        );
+            Metasound::FDataVertexMetadata MetaData() const {
+                return { Tooltip(), DisplayName() };
             }
 
-            return params;
-        }
+            const TCHAR * Name() const { return mName.GetCharArray().GetData(); }
+            const FText Tooltip() const { return mTooltip; }
+            const FText DisplayName() const { return mDisplayName; }
+            float InitialValue() const { return mInitialValue; }
 
-        static std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> InportTrig(const RNBO::Json& desc) {
-            std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> params;
-            for (auto& p: desc["inports"]) {
-              std::string tag = p["tag"];
-              std::string description = tag;
-              std::string displayName = tag;
-              if (p.contains("meta")) {
-                //TODO get description and display name
-                
-                //TODO
-                /*
-                if (p["meta"].contains("trigger") && p["meta"]["trigger"].is_bool() && p["meta"]["trigger"].get<bool>()) {
+            static std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> InputFloat(const RNBO::Json& desc) {
+                std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> params;
+
+                for (auto& p: desc["parameters"]) {
+                    if (p["type"].get<std::string>().compare("ParameterTypeNumber") != 0) {
+                        continue;
+                    }
+
+                    if (p.contains("visible") && p["visible"].get<bool>() == false) {
+                        continue;
+                    }
+
+                    RNBO::ParameterIndex index = static_cast<RNBO::ParameterIndex>(p["index"].get<int>());
+                    std::string name = p["name"].get<std::string>();
+                    std::string displayName = p["displayName"].get<std::string>();
+                    std::string id = p["paramId"].get<std::string>();
+                    float initialValue = p["initialValue"].get<float>();
+                    if (displayName.size() == 0) {
+                        displayName = name;
+                    }
+                    params.emplace(
+                            index, 
+                            FRNBOMetasoundParam(FString(name.c_str()), FText::AsCultureInvariant(id.c_str()), FText::AsCultureInvariant(displayName.c_str()), initialValue)
+                            );
                 }
-                */
-              }
-              RNBO::MessageTag id = RNBO::TAG(tag.c_str());
-                params.emplace(
-                        id, 
-                        FRNBOMetasoundParam(FString(tag.c_str()), FText::AsCultureInvariant(description.c_str()), FText::AsCultureInvariant(displayName.c_str()))
-                        );
+
+                return params;
             }
 
-            return params;
-        }
+            static std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> InportTrig(const RNBO::Json& desc) {
+                std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> params;
+                for (auto& p: desc["inports"]) {
+                    std::string tag = p["tag"];
+                    std::string description = tag;
+                    std::string displayName = tag;
+                    if (p.contains("meta")) {
+                        //TODO get description and display name
 
-        static std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> OutportTrig(const RNBO::Json& desc) {
-            std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> params;
-            for (auto& p: desc["outports"]) {
-              std::string tag = p["tag"];
-              std::string description = tag;
-              std::string displayName = tag;
-              if (p.contains("meta")) {
-                //TODO get description and display name
-                
-                //TODO
-                /*
-                if (p["meta"].contains("trigger") && p["meta"]["trigger"].is_bool() && p["meta"]["trigger"].get<bool>()) {
+                        //TODO
+                        /*
+                           if (p["meta"].contains("trigger") && p["meta"]["trigger"].is_bool() && p["meta"]["trigger"].get<bool>()) {
+                           }
+                           */
+                    }
+                    RNBO::MessageTag id = RNBO::TAG(tag.c_str());
+                    params.emplace(
+                            id, 
+                            FRNBOMetasoundParam(FString(tag.c_str()), FText::AsCultureInvariant(description.c_str()), FText::AsCultureInvariant(displayName.c_str()))
+                            );
                 }
-                */
-              }
-              RNBO::MessageTag id = RNBO::TAG(tag.c_str());
-                params.emplace(
-                        id, 
-                        FRNBOMetasoundParam(FString(tag.c_str()), FText::AsCultureInvariant(description.c_str()), FText::AsCultureInvariant(displayName.c_str()))
-                        );
+
+                return params;
             }
 
-            return params;
-        }
+            static std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> OutportTrig(const RNBO::Json& desc) {
+                std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> params;
+                for (auto& p: desc["outports"]) {
+                    std::string tag = p["tag"];
+                    std::string description = tag;
+                    std::string displayName = tag;
+                    if (p.contains("meta")) {
+                        //TODO get description and display name
 
-        static std::vector<FRNBOMetasoundParam> InputAudio(const RNBO::Json& desc) {
-            //TODO param~
-            return Signals(desc, "inlets");
-        }
-
-        static std::vector<FRNBOMetasoundParam> OutputAudio(const RNBO::Json& desc) {
-            return Signals(desc, "outlets");
-        }
-
-    private:
-
-        static std::vector<FRNBOMetasoundParam> Signals(const RNBO::Json& desc, std::string selector) {
-            std::vector<FRNBOMetasoundParam> params;
-
-            const std::string sig("signal");
-            for (auto& p: desc[selector]) {
-                if (p.contains("type") && sig.compare(p["type"].get<std::string>()) == 0) {
-                    std::string name = p["tag"].get<std::string>();
-                    params.emplace_back(FString(name.c_str()), FText::AsCultureInvariant(name.c_str()), FText::AsCultureInvariant(name.c_str()), 0.0f);
+                        //TODO
+                        /*
+                           if (p["meta"].contains("trigger") && p["meta"]["trigger"].is_bool() && p["meta"]["trigger"].get<bool>()) {
+                           }
+                           */
+                    }
+                    RNBO::MessageTag id = RNBO::TAG(tag.c_str());
+                    params.emplace(
+                            id, 
+                            FRNBOMetasoundParam(FString(tag.c_str()), FText::AsCultureInvariant(description.c_str()), FText::AsCultureInvariant(displayName.c_str()))
+                            );
                 }
+
+                return params;
             }
 
-            return params;
-        }
+            static std::vector<FRNBOMetasoundParam> InputAudio(const RNBO::Json& desc) {
+                //TODO param~
+                return Signals(desc, "inlets");
+            }
 
-        const FString mName;
-        float mInitialValue;
-        const FText mTooltip;
-        const FText mDisplayName;
-};
+            static std::vector<FRNBOMetasoundParam> OutputAudio(const RNBO::Json& desc) {
+                return Signals(desc, "outlets");
+            }
+
+        private:
+
+            static std::vector<FRNBOMetasoundParam> Signals(const RNBO::Json& desc, std::string selector) {
+                std::vector<FRNBOMetasoundParam> params;
+
+                const std::string sig("signal");
+                for (auto& p: desc[selector]) {
+                    if (p.contains("type") && sig.compare(p["type"].get<std::string>()) == 0) {
+                        std::string name = p["tag"].get<std::string>();
+                        params.emplace_back(FString(name.c_str()), FText::AsCultureInvariant(name.c_str()), FText::AsCultureInvariant(name.c_str()), 0.0f);
+                    }
+                }
+
+                return params;
+            }
+
+            const FString mName;
+            float mInitialValue;
+            const FText mTooltip;
+            const FText mDisplayName;
+    };
 
 
 #undef LOCTEXT_NAMESPACE
 #define LOCTEXT_NAMESPACE "FRNBOOperator"
 
-//https://en.cppreference.com/w/cpp/language/template_parameters
-template<const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr(*FactoryFunction)(RNBO::PlatformInterface* platformInterface)>
-class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>, public RNBO::EventHandler
-{
-    private:
-        RNBO::CoreObject CoreObject;
-        RNBO::TimeConverter Converter = RNBO::TimeConverter(44100.0, 0.0);
-        RNBO::ParameterEventInterfaceUniquePtr ParamInterface;
+    //https://en.cppreference.com/w/cpp/language/template_parameters
+    template<const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr(*FactoryFunction)(RNBO::PlatformInterface* platformInterface)>
+        class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>, public RNBO::EventHandler
+    {
+        private:
+            RNBO::CoreObject CoreObject;
+            RNBO::TimeConverter Converter = RNBO::TimeConverter(44100.0, 0.0);
+            RNBO::ParameterEventInterfaceUniquePtr ParamInterface;
 
-        int32 mNumFrames;
+            int32 mNumFrames;
 
-        std::unordered_map<RNBO::ParameterIndex, Metasound::FFloatReadRef> mInputFloatParams;
-        std::unordered_map<RNBO::MessageTag, Metasound::FTriggerReadRef> mInportTriggerParams;
+            std::unordered_map<RNBO::ParameterIndex, Metasound::FFloatReadRef> mInputFloatParams;
+            std::unordered_map<RNBO::MessageTag, Metasound::FTriggerReadRef> mInportTriggerParams;
 
-        std::vector<Metasound::FAudioBufferReadRef> mInputAudioParams;
-        std::vector<const float *> mInputAudioBuffers;
+            std::vector<Metasound::FAudioBufferReadRef> mInputAudioParams;
+            std::vector<const float *> mInputAudioBuffers;
 
-        std::unordered_map<RNBO::MessageTag, Metasound::FTriggerWriteRef> mOutportTriggerParams;
-        std::vector<Metasound::FAudioBufferWriteRef> mOutputAudioParams;
-        std::vector<float *> mOutputAudioBuffers;
+            std::unordered_map<RNBO::MessageTag, Metasound::FTriggerWriteRef> mOutportTriggerParams;
+            std::vector<Metasound::FAudioBufferWriteRef> mOutputAudioParams;
+            std::vector<float *> mOutputAudioBuffers;
 
-        TOptional<FTransportReadRef> Transport;
+            TOptional<FTransportReadRef> Transport;
 
-        double LastTransportBeatTime = -1.0;
-        float LastTransportBPM = 0.0f;
-        bool LastTransportRun = false;
-        int32 LastTransportNum = 0;
-        int32 LastTransportDen = 0;
+            double LastTransportBeatTime = -1.0;
+            float LastTransportBPM = 0.0f;
+            bool LastTransportRun = false;
+            int32 LastTransportNum = 0;
+            int32 LastTransportDen = 0;
 
-        static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputFloatParams() {
-            static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
-            return Params;
-        }
+            static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputFloatParams() {
+                static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
+                return Params;
+            }
 
-        static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam>& InportTrig() {
-            static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InportTrig(desc);
-            return Params;
-        }
+            static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam>& InportTrig() {
+                static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InportTrig(desc);
+                return Params;
+            }
 
-        static const std::vector<FRNBOMetasoundParam>& InputAudioParams() {
-            static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputAudio(desc);
-            return Params;
-        }
+            static const std::vector<FRNBOMetasoundParam>& InputAudioParams() {
+                static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputAudio(desc);
+                return Params;
+            }
 
-        static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam>& OutportTrig() {
-            static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::OutportTrig(desc);
-            return Params;
-        }
+            static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam>& OutportTrig() {
+                static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::OutportTrig(desc);
+                return Params;
+            }
 
-        static const std::vector<FRNBOMetasoundParam>& OutputAudioParams() {
-            static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::OutputAudio(desc);
-            return Params;
-        }
+            static const std::vector<FRNBOMetasoundParam>& OutputAudioParams() {
+                static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::OutputAudio(desc);
+                return Params;
+            }
 
-        static const bool WithTransport() {
-            //TODO config based on description
-            return true;
-        }
+            static const bool WithTransport() {
+                //TODO config based on description
+                return true;
+            }
 
-    public:
+        public:
             static const Metasound::FNodeClassMetadata& GetNodeInfo() {
                 auto InitNodeInfo = []() -> Metasound::FNodeClassMetadata
                 {
@@ -232,8 +241,8 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     Info.MinorVersion = 1;
                     Info.DisplayName = DisplayName;
                     Info.Description = Description;
-                    Info.Author = PluginAuthor;
-                    Info.PromptIfMissing = PluginNodeMissingPrompt;
+                    Info.Author = Metasound::PluginAuthor;
+                    Info.PromptIfMissing = Metasound::PluginNodeMissingPrompt;
                     Info.DefaultInterface = GetVertexInterface();
                     Info.CategoryHierarchy = { Category };
                     return Info;
@@ -245,6 +254,9 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
             }
 
             static const Metasound::FVertexInterface& GetVertexInterface() {
+                using Metasound::TInputDataVertex;
+                using Metasound::TOutputDataVertex;
+
                 auto Init = []() -> Metasound::FVertexInterface
                 {
                     Metasound::FInputVertexInterface inputs;
@@ -260,7 +272,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                     }
 
                     if (WithTransport()) {
-                        inputs.Add(TInputDataVertex<Metasound::FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
+                        inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
                     }
 
                     for (auto& p: InputAudioParams()) {
@@ -286,7 +298,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                 return Interface;
             }
 
-            static TUniquePtr<IOperator> CreateOperator(const Metasound::FCreateOperatorParams& InParams, Metasound::FBuildErrorArray& OutErrors) {
+            static TUniquePtr<Metasound::IOperator> CreateOperator(const Metasound::FCreateOperatorParams& InParams, Metasound::FBuildErrorArray& OutErrors) {
                 const Metasound::FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
                 const Metasound::FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
@@ -303,36 +315,36 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                 CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())())),
                 mNumFrames(InSettings.GetNumFramesPerBlock())
 
-                    {
-                        CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
-                        //all params are handled in the audio thread
-                        ParamInterface = CoreObject.createParameterInterface(RNBO::ParameterEventInterface::NotThreadSafe, this);
+        {
+            CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
+            //all params are handled in the audio thread
+            ParamInterface = CoreObject.createParameterInterface(RNBO::ParameterEventInterface::NotThreadSafe, this);
 
-                        for (auto& it: InportTrig()) {
-                            mInportTriggerParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstruct<Metasound::FTrigger>(it.second.Name(), InSettings));
-                        }
+            for (auto& it: InportTrig()) {
+                mInportTriggerParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstruct<Metasound::FTrigger>(it.second.Name(), InSettings));
+            }
 
-                        for (auto& it: InputFloatParams()) {
-                            mInputFloatParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, it.second.Name(), InSettings));
-                        }
+            for (auto& it: InputFloatParams()) {
+                mInputFloatParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, it.second.Name(), InSettings));
+            }
 
-                        for (auto& p: InputAudioParams()) {
-                            mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FAudioBuffer>(p.Name(), InSettings));
-                            mInputAudioBuffers.emplace_back(nullptr);
-                        }
+            for (auto& p: InputAudioParams()) {
+                mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FAudioBuffer>(p.Name(), InSettings));
+                mInputAudioBuffers.emplace_back(nullptr);
+            }
 
-                        for (auto& it: OutportTrig()) {
-                            mOutportTriggerParams.emplace(it.first, Metasound::FTriggerWriteRef::CreateNew(InSettings));
-                        }
+            for (auto& it: OutportTrig()) {
+                mOutportTriggerParams.emplace(it.first, Metasound::FTriggerWriteRef::CreateNew(InSettings));
+            }
 
-                        for (auto& p: OutputAudioParams()) {
-                            mOutputAudioParams.emplace_back(Metasound::FAudioBufferWriteRef::CreateNew(InSettings));
-                            mOutputAudioBuffers.emplace_back(nullptr);
-                        }
-                        if (WithTransport()) {
-                            Transport = {InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport))};
-                        }
-                    }
+            for (auto& p: OutputAudioParams()) {
+                mOutputAudioParams.emplace_back(Metasound::FAudioBufferWriteRef::CreateNew(InSettings));
+                mOutputAudioBuffers.emplace_back(nullptr);
+            }
+            if (WithTransport()) {
+                Transport = {InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport))};
+            }
+        }
 
             virtual void BindInputs(Metasound::FInputVertexInterfaceData& InOutVertexData) override
             {
@@ -479,7 +491,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
             virtual void eventsAvailable() {  
                 drainEvents();
             }
-            
+
             virtual void handleMessageEvent(const RNBO::MessageEvent& event) override { 
                 switch (event.getType()) {
                     case RNBO::MessageEvent::Type::Bang: 
@@ -496,6 +508,7 @@ class FRNBOOperator : public TExecutableOperator<FRNBOOperator<desc, FactoryFunc
                         break;
                 }
             }
-};
+    };
+}
 
 #undef LOCTEXT_NAMESPACE

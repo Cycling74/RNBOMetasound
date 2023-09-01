@@ -1,15 +1,6 @@
-#include "Internationalization/Text.h"
-#include "MetasoundExecutableOperator.h"
-#include "MetasoundNodeRegistrationMacro.h"
-#include "MetasoundParamHelper.h"
-#include "MetasoundPrimitives.h"
-#include "MetasoundTime.h"
-#include "MetasoundAudioBuffer.h"
-#include "DSP/Delay.h"
-#include "MetasoundStandardNodesCategories.h"
-#include "MetasoundFacade.h"
-#include "RNBOMetasound.h"
 #include "RNBOOperator.h"
+#include "RNBONode.h"
+#include "MetasoundNodeRegistrationMacro.h"
 
 //visual studio warnings we're having trouble with
 #pragma warning ( disable : 4800 4065 4668 4804 4018 4060 4554 4018 )
