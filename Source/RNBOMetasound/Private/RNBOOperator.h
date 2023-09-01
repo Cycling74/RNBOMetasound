@@ -572,6 +572,9 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         for (auto it : mOutportTriggerParams) {
             it.second->Reset();
         }
+        if (MIDIOut.IsSet()) {
+            MIDIOut.GetValue()->Reset();
+        }
     }
 
     virtual void eventsAvailable()

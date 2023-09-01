@@ -86,4 +86,10 @@ void FMIDIBuffer::Push(FMIDIPacket packet)
     Packets.Push(packet);
 }
 
+void FMIDIBuffer::Reset()
+{
+    Packets.Reset();
+    CountInBlock = 0;
+}
+
 } // namespace RNBOMetasound
