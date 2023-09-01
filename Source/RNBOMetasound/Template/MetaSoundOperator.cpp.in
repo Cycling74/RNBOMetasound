@@ -1,15 +1,13 @@
 // based on Copyright Epic Games, Inc. All Rights Reserved.
-namespace _OPERATOR_NAME_
-{
-	using namespace Metasound;
-	using namespace RNBOMetasound;
+namespace _OPERATOR_NAME_ {
+using namespace Metasound;
+using namespace RNBOMetasound;
 
-	namespace 
-	{
-        const RNBO::Json desc = RNBO::Json::parse(_OPERATOR_DESC_);
-	}
-
-    using _OPERATOR_NAME_Operator = FRNBOOperator<desc, RNBO::_OPERATOR_NAME_FactoryFunction>;
-    using _OPERATOR_NAME_Node = FGenericNode<_OPERATOR_NAME_Operator>;
-	METASOUND_REGISTER_NODE(_OPERATOR_NAME_Node)
+namespace {
+const RNBO::Json desc = RNBO::Json::parse(_OPERATOR_DESC_);
 }
+
+using _OPERATOR_NAME_Operator = FRNBOOperator<desc, RNBO::_OPERATOR_NAME_FactoryFunction>;
+using _OPERATOR_NAME_Node = FGenericNode<_OPERATOR_NAME_Operator>;
+METASOUND_REGISTER_NODE(_OPERATOR_NAME_Node)
+} // namespace _OPERATOR_NAME_

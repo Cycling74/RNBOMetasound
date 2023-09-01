@@ -1,0 +1,89 @@
+# initial attempt at a clang-format reflow of the C74 code base
+# there are a couple of things which aren't currently ideal:
+# - the InsertBraces commands isn't available yet (on macOS at least), requires clang-format 15
+# - there are some oddnesses with line comments, where the number of spaces post-comment isn't
+#   properly enforced due to the use of tab characters.
+# some of this stuff might be possible with clang-tidy (part of LLVM, can't be installed separately)
+# or with Uncrustify, if we decide to use that instead. Otherwise, this is a pretty strong basis to start with
+
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+IndentAccessModifiers: false
+ColumnLimit: 0
+
+#ContinuationIndentWidth: 4
+#TabWidth: 4
+#UseTab: ForContinuationAndIndentation
+
+---
+Language: Cpp
+DerivePointerAlignment: false
+PointerAlignment: Left
+Cpp11BracedListStyle: false
+BreakBeforeBinaryOperators: NonAssignment
+IndentCaseLabels: true
+AlignTrailingComments: false
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortFunctionsOnASingleLine: Inline
+SortIncludes: false
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterCaseLabel: true
+  AfterControlStatement: MultiLine
+  AfterEnum: true
+  AfterFunction: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeElse: true
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+  SplitEmptyFunction: true
+
+BreakInheritanceList: BeforeComma
+BreakConstructorInitializers: BeforeComma
+InsertBraces: true # need to wait for clang-format v15
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: 1
+PackConstructorInitializers: CurrentLine
+
+---
+Language: ObjC
+DerivePointerAlignment: false
+PointerAlignment: Left
+Cpp11BracedListStyle: false
+BreakBeforeBinaryOperators: NonAssignment
+IndentCaseLabels: true
+AlignTrailingComments: false
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortFunctionsOnASingleLine: Inline
+SortIncludes: false
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterCaseLabel: true
+  AfterControlStatement: MultiLine
+  AfterEnum: true
+  AfterFunction: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeElse: true
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+  SplitEmptyFunction: true
+
+BreakInheritanceList: BeforeComma
+BreakConstructorInitializers: BeforeComma
+InsertBraces: true # need to wait for clang-format v15
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: 1
+PackConstructorInitializers: CurrentLine

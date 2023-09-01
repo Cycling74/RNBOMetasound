@@ -19,7 +19,7 @@ public class RNBOMetasound : ModuleRules
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		UnsafeTypeCastWarningLevel = WarningLevel.Warning;
-		ShadowVariableWarningLevel = WarningLevel.Warning; 
+		ShadowVariableWarningLevel = WarningLevel.Warning;
 
 		var templateDir = Path.Combine(PluginDirectory, "Source", "RNBOMetasound", "Template");
 		var templateFile = Path.Combine(templateDir, "MetaSoundOperator.cpp.in");
@@ -60,13 +60,13 @@ public class RNBOMetasound : ModuleRules
 
 		ExternalDependencies.Add(templateFile);
 		ExternalDependencies.Add(exportDir);
-		
+
 		PublicIncludePaths.AddRange(
 			new string[] {
 				// ... add public include paths required here ...
 			}
 			);
-				
+
 
 		PrivateIncludePaths.AddRange(
 			new string[]
@@ -78,7 +78,7 @@ public class RNBOMetasound : ModuleRules
 				Path.Combine(rnboDir, "src", "3rdparty"),
 			}
 			);
-		
+
 
 		PublicDependencyModuleNames.AddRange(
 			new string[]
@@ -90,8 +90,8 @@ public class RNBOMetasound : ModuleRules
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
-			
-		
+
+
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
@@ -99,11 +99,11 @@ public class RNBOMetasound : ModuleRules
 				"Engine",
 				"SignalProcessing",
 				//Path.Combine(rnboDir, "RNBO.cpp"),
-				// ... add private dependencies that you statically link with here ...	
+				// ... add private dependencies that you statically link with here ...
 			}
 			);
-		
-		
+
+
 		DynamicallyLoadedModuleNames.AddRange(
 			new string[]
 			{
