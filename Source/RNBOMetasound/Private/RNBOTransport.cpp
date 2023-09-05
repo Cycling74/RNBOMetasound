@@ -37,6 +37,50 @@ struct Metasound::TEnableAutoConverterNodeRegistration<FromDataType, RNBOMetasou
     static constexpr bool Value = false;
 };
 
+namespace RNBOMetasound {
+FTransport::FTransport(bool bRun, float bBPM, int32 bTimeSigNum, int32 bTimeSigDen)
+    : BeatTime(0.0)
+    , Run(bRun)
+    , BPM(std::max(0.0f, bBPM))
+    , TimeSig(std::make_tuple(std::max(1, bTimeSigNum), std::max(1, bTimeSigDen)))
+{
+}
+
+FTime FTransport::GetBeatTime() const
+{
+    return BeatTime;
+}
+bool FTransport::GetRun() const
+{
+    return Run;
+}
+float FTransport::GetBPM() const
+{
+    return BPM;
+}
+std::tuple<int32, int32> FTransport::GetTimeSig() const
+{
+    return TimeSig;
+}
+
+void FTransport::SetBeatTime(FTime v)
+{
+    BeatTime = v;
+}
+void FTransport::SetRun(bool v)
+{
+    Run = v;
+}
+void FTransport::SetBPM(float v)
+{
+    BPM = std::max(0.0f, v);
+}
+void FTransport::SetTimeSig(std::tuple<int32, int32> v)
+{
+    TimeSig = std::make_tuple(std::max(1, std::get<0>(v)), std::max(1, std::get<1>(v)));
+}
+} // namespace RNBOMetasound
+
 REGISTER_METASOUND_DATATYPE(RNBOMetasound::FTransport, "Transport", ::Metasound::ELiteralType::Boolean)
 
 #define LOCTEXT_NAMESPACE "FRNBOTransport"

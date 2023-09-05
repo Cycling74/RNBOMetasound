@@ -19,26 +19,17 @@ METASOUND_PARAM(ParamTransport, "Transport", "The transport.")
 class RNBOMETASOUND_API FTransport
 {
   public:
-    FTransport(bool bRun = true, float bBPM = 120.0, int32 bTimeSigNum = 4, int32 bTimeSigDen = 4)
-        : BeatTime(0.0)
-        , Run(bRun)
-        , BPM(std::max(0.0f, bBPM))
-        , TimeSig(std::make_tuple(std::max(1, bTimeSigNum), std::max(1, bTimeSigDen)))
-    {
-    }
+    FTransport(bool bRun = true, float bBPM = 120.0, int32 bTimeSigNum = 4, int32 bTimeSigDen = 4);
 
-    FTime GetBeatTime() const { return BeatTime; }
-    bool GetRun() const { return Run; }
-    float GetBPM() const { return BPM; }
-    std::tuple<int32, int32> GetTimeSig() const { return TimeSig; }
+    FTime GetBeatTime() const;
+    bool GetRun() const;
+    float GetBPM() const;
+    std::tuple<int32, int32> GetTimeSig() const;
 
-    void SetBeatTime(FTime v) { BeatTime = v; }
-    void SetRun(bool v) { Run = v; }
-    void SetBPM(float v) { BPM = std::max(0.0f, v); }
-    void SetTimeSig(std::tuple<int32, int32> v)
-    {
-        TimeSig = std::make_tuple(std::max(1, std::get<0>(v)), std::max(1, std::get<1>(v)));
-    }
+    void SetBeatTime(FTime v);
+    void SetRun(bool v);
+    void SetBPM(float v);
+    void SetTimeSig(std::tuple<int32, int32> v);
 
   private:
     FTime BeatTime;
