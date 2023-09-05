@@ -11,12 +11,12 @@ class RNBOMETASOUND_API FMIDIPacket
     FMIDIPacket(int32 frame, size_t length, const uint8_t* data);
     FMIDIPacket(const FMIDIPacket&) = default;
 
-    int32 Frame() const { return mFrame; }
-    const std::array<uint8_t, 3>& Data() const { return mData; }
-    size_t Length() const { return static_cast<size_t>(mLength); }
+    int32 Frame() const;
+    const std::array<uint8_t, 3>& Data() const;
+    size_t Length() const;
 
     /** Advance internal frame counters by specific frame count. */
-    void Advance(int32 InNumFrames) { mFrame -= InNumFrames; }
+    void Advance(int32 InNumFrames);
 
   private:
     int32 mFrame;

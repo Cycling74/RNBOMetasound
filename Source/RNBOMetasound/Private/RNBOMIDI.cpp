@@ -39,6 +39,7 @@ struct Metasound::TEnableAutoConverterNodeRegistration<FromDataType, RNBOMetasou
 REGISTER_METASOUND_DATATYPE(RNBOMetasound::FMIDIBuffer, "MIDIBuffer")
 
 namespace RNBOMetasound {
+
 FMIDIPacket::FMIDIPacket(int32 frame, size_t length, const uint8_t* data)
     : mFrame(frame)
     , mLength(static_cast<uint8_t>(std::min(length, mData.size())))
@@ -46,6 +47,24 @@ FMIDIPacket::FMIDIPacket(int32 frame, size_t length, const uint8_t* data)
     for (auto i = 0; i < std::min(length, mData.size()); i++) {
         mData[i] = data[i];
     }
+}
+
+int32 FMIDIPacket::Frame() const
+{
+    return mFrame;
+}
+const std::array<uint8_t, 3>& FMIDIPacket::Data() const
+{
+    return mData;
+}
+size_t FMIDIPacket::Length() const
+{
+    return static_cast<size_t>(mLength);
+}
+
+void FMIDIPacket::Advance(int32 InNumFrames)
+{
+    mFrame -= InNumFrames;
 }
 
 FMIDIBuffer::FMIDIBuffer(const Metasound::FOperatorSettings& InSettings)
