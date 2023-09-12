@@ -56,27 +56,30 @@ class FRNBOMetasoundParam
     {
         std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> params;
 
-        for (auto& p : desc["parameters"]) {
-            if (p["type"].get<std::string>().compare("ParameterTypeNumber") != 0) {
-                continue;
+        NumericParams(desc, [&params](const RNBO::Json& p, RNBO::ParameterIndex index, const std::string& name, const std::string& displayName, const std::string& id) {
+            if (!IsBoolParam(p)) {
+                float initialValue = p["initialValue"].get<float>();
+                params.emplace(
+                    index,
+                    FRNBOMetasoundParam(FString(name.c_str()), FText::AsCultureInvariant(id.c_str()), FText::AsCultureInvariant(displayName.c_str()), initialValue));
             }
+        });
 
-            if (p.contains("visible") && p["visible"].get<bool>() == false) {
-                continue;
-            }
+        return params;
+    }
 
-            RNBO::ParameterIndex index = static_cast<RNBO::ParameterIndex>(p["index"].get<int>());
-            std::string name = p["name"].get<std::string>();
-            std::string displayName = p["displayName"].get<std::string>();
-            std::string id = p["paramId"].get<std::string>();
-            float initialValue = p["initialValue"].get<float>();
-            if (displayName.size() == 0) {
-                displayName = name;
+    static std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> InputBool(const RNBO::Json& desc)
+    {
+        std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> params;
+
+        NumericParams(desc, [&params](const RNBO::Json& p, RNBO::ParameterIndex index, const std::string& name, const std::string& displayName, const std::string& id) {
+            if (IsBoolParam(p)) {
+                float initialValue = p["initialValue"].get<float>();
+                params.emplace(
+                    index,
+                    FRNBOMetasoundParam(FString(name.c_str()), FText::AsCultureInvariant(id.c_str()), FText::AsCultureInvariant(displayName.c_str()), initialValue));
             }
-            params.emplace(
-                index,
-                FRNBOMetasoundParam(FString(name.c_str()), FText::AsCultureInvariant(id.c_str()), FText::AsCultureInvariant(displayName.c_str()), initialValue));
-        }
+        });
 
         return params;
     }
@@ -168,6 +171,35 @@ class FRNBOMetasoundParam
         return params;
     }
 
+    static void NumericParams(const RNBO::Json& desc, std::function<void(const RNBO::Json& param, RNBO::ParameterIndex index, const std::string& name, const std::string& displayName, const std::string& id)> func)
+    {
+        for (auto& p : desc["parameters"]) {
+            if (p["type"].get<std::string>().compare("ParameterTypeNumber") != 0) {
+                continue;
+            }
+            if (p.contains("visible") && p["visible"].get<bool>() == false) {
+                continue;
+            }
+            RNBO::ParameterIndex index = static_cast<RNBO::ParameterIndex>(p["index"].get<int>());
+            std::string name = p["name"].get<std::string>();
+            std::string displayName = p["displayName"].get<std::string>();
+            if (displayName.size() == 0) {
+                displayName = name;
+            }
+            std::string id = p["paramId"].get<std::string>();
+            func(p, index, name, displayName, id);
+        }
+    }
+
+    static bool IsBoolParam(const RNBO::Json& p)
+    {
+        if (p["steps"].get<int>() == 2 && p["enumValues"].is_array()) {
+            auto e = p["enumValues"];
+            return e[0].is_number() && e[1].is_number() && e[0].get<float>() == 0.0f && e[1].get<float>() == 1.0f;
+        }
+        return false;
+    }
+
     const FString mName;
     float mInitialValue;
     const FText mTooltip;
@@ -190,6 +222,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     int32 mNumFrames;
 
     std::unordered_map<RNBO::ParameterIndex, Metasound::FFloatReadRef> mInputFloatParams;
+    std::unordered_map<RNBO::ParameterIndex, Metasound::FBoolReadRef> mInputBoolParams;
     std::unordered_map<RNBO::MessageTag, Metasound::FTriggerReadRef> mInportTriggerParams;
 
     std::vector<Metasound::FAudioBufferReadRef> mInputAudioParams;
@@ -213,6 +246,12 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputFloatParams()
     {
         static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputFloat(desc);
+        return Params;
+    }
+
+    static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputBoolParams()
+    {
+        static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InputBool(desc);
         return Params;
     }
 
@@ -321,6 +360,11 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                 inputs.Add(TInputDataVertex<float>(p.Name(), p.MetaData(), p.InitialValue()));
             }
 
+            for (auto& it : InputBoolParams()) {
+                auto& p = it.second;
+                inputs.Add(TInputDataVertex<bool>(p.Name(), p.MetaData(), p.InitialValue() != 0.0f));
+            }
+
             if (WithTransport()) {
                 inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
             }
@@ -386,6 +430,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             mInputFloatParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, it.second.Name(), InSettings));
         }
 
+        for (auto& it : InputBoolParams()) {
+            mInputBoolParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, it.second.Name(), InSettings));
+        }
+
         for (auto& p : InputAudioParams()) {
             mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FAudioBuffer>(p.Name(), InSettings));
             mInputAudioBuffers.emplace_back(nullptr);
@@ -428,6 +476,16 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         {
             auto lookup = InputFloatParams();
             for (auto& [index, p] : mInputFloatParams) {
+                auto it = lookup.find(index);
+                // should never fail
+                if (it != lookup.end()) {
+                    InOutVertexData.BindReadVertex(it->second.Name(), p);
+                }
+            }
+        }
+        {
+            auto lookup = InputBoolParams();
+            for (auto& [index, p] : mInputBoolParams) {
                 auto it = lookup.find(index);
                 // should never fail
                 if (it != lookup.end()) {
@@ -558,6 +616,12 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
         for (auto& [index, p] : mInputFloatParams) {
             double v = static_cast<double>(*p);
+            if (v != ParamInterface->getParameterValue(index)) {
+                ParamInterface->setParameterValue(index, v);
+            }
+        }
+        for (auto& [index, p] : mInputBoolParams) {
+            double v = *p ? 1.0 : 0.0;
             if (v != ParamInterface->getParameterValue(index)) {
                 ParamInterface->setParameterValue(index, v);
             }
