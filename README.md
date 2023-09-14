@@ -1,5 +1,12 @@
 # RNBO MetaSounds
 
+# Parameter metadata
+
+* `[param foo]` will create an input pin
+* `[param foo @meta in:true]` will only create an input pin
+* `[param foo @meta out:true]` will create both an input and an output pin
+* `[param foo @meta in:false,out:true]` will only create an output pin
+
 
 ## Links
 
