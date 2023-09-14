@@ -1,6 +1,6 @@
 # RNBO MetaSounds
 
-# Parameter metadata
+## Parameter metadata
 
 * `[param foo]` will create an input pin
 * `[param foo @meta in:true]` will only create an input pin
