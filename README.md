@@ -7,6 +7,9 @@
 * `[param foo @meta out:true]` will create both an input and an output pin
 * `[param foo @meta in:false,out:true]` will only create an output pin
 
+## Parameters to pin types
+
+* `[param foo @enum 0 1]` will be treated as a boolean type in the MS graph
 
 ## Links
 
