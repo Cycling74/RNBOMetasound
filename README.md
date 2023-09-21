@@ -6,6 +6,8 @@ This repository will help you create a custom node for a MetaSounds graph in Unr
 
 In addition to a node which will hold your RNBO export, this repository will also build utility nodes, like a `Transport` node which will help you utilize RNBO's built-in transport within your MetaSounds graph. 
 
+### Where to Put this Repository
+
 To get started, clone this repository into your UE Project's `Plugins` directory, and check out [our documentation here](docs/README.md).
 
 ## Experimental State and Current Limitations
