@@ -49,6 +49,18 @@ FMIDIPacket::FMIDIPacket(int32 frame, size_t length, const uint8_t* data)
     }
 }
 
+FMIDIPacket FMIDIPacket::NoteOn(int32 frame, uint8_t num, uint8_t vel, uint8_t chan)
+{
+    std::array<uint8_t, 3> data = { 0x90 | (chan & 0x0F), num, vel };
+    return FMIDIPacket(frame, data.size(), data.data());
+}
+
+FMIDIPacket FMIDIPacket::NoteOff(int32 frame, uint8_t num, uint8_t vel, uint8_t chan)
+{
+    std::array<uint8_t, 3> data = { 0x80 | (chan & 0x0F), num, vel };
+    return FMIDIPacket(frame, data.size(), data.data());
+}
+
 int32 FMIDIPacket::Frame() const
 {
     return mFrame;

@@ -11,6 +11,10 @@ class RNBOMETASOUND_API FMIDIPacket
     FMIDIPacket(int32 frame, size_t length, const uint8_t* data);
     FMIDIPacket(const FMIDIPacket&) = default;
 
+    // expects values to be in range
+    static FMIDIPacket NoteOn(int32 frame, uint8_t num, uint8_t vel, uint8_t chan);
+    static FMIDIPacket NoteOff(int32 frame, uint8_t num, uint8_t vel, uint8_t chan);
+
     int32 Frame() const;
     const std::array<uint8_t, 3>& Data() const;
     size_t Length() const;
