@@ -42,7 +42,6 @@ class RNBOMETASOUND_API FMIDIBuffer
      */
     const FMIDIPacket& operator[](int32 index) const;
 
-    // push a packet, NOTE: expects packets come in frame order, lowest frame first
     void Push(FMIDIPacket packet);
 
     void Reset();
@@ -50,6 +49,7 @@ class RNBOMETASOUND_API FMIDIBuffer
   private:
     int32 NumFramesPerBlock = 0;
     int32 CountInBlock = 0;
+    int32 LastFrame = -1;
 
     TArray<FMIDIPacket> Packets;
 };

@@ -76,6 +76,7 @@ void FMIDIBuffer::AdvanceBlock()
 {
     Packets.RemoveAt(0, CountInBlock, false);
     CountInBlock = 0;
+    LastFrame = -1;
 
     const int32 cnt = Packets.Num();
     for (int32 i = 0; i < cnt; i++) {
@@ -84,6 +85,7 @@ void FMIDIBuffer::AdvanceBlock()
         if (packet.Frame() < NumFramesPerBlock) {
             CountInBlock++;
         }
+        LastFrame = packet.Frame();
     }
 }
 
@@ -99,10 +101,31 @@ const FMIDIPacket& FMIDIBuffer::operator[](int32 index) const
 
 void FMIDIBuffer::Push(FMIDIPacket packet)
 {
-    if (packet.Frame() < NumFramesPerBlock) {
+    auto frame = packet.Frame();
+    if (frame < NumFramesPerBlock) {
         CountInBlock++;
     }
-    Packets.Push(packet);
+
+    // simple push back or insertion sort
+    if (frame >= LastFrame) {
+        LastFrame = frame;
+        Packets.Push(packet);
+    }
+    else {
+        // insertion sort
+        auto cnt = Packets.Num();
+        for (auto i = 0; i < cnt; i++) {
+            // insert before a packet that has a larger frame
+            // new packets at the same frame will always come last
+            // since the above if failed, we know this will never be the last packet
+            // so we will always have an insert
+            if (Packets[i].Frame() > frame) {
+                Packets.Insert(packet, i);
+                return;
+            }
+        }
+        // assert false?
+    }
 }
 
 void FMIDIBuffer::Reset()
