@@ -664,15 +664,6 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             }
         }
 
-        {
-            for (auto& [tag, p] : mInportTriggerParams) {
-                for (int32 i = 0; i < p->NumTriggeredInBlock(); i++) {
-                    auto frame = (*p)[i];
-                    ParamInterface->sendMessage(tag, 0, Converter.convertSampleOffsetToMilliseconds(static_cast<RNBO::SampleOffset>(frame)));
-                }
-            }
-        }
-
         for (auto& [index, p] : mInputFloatParams) {
             double v = static_cast<double>(*p);
             if (v != ParamInterface->getParameterValue(index)) {
@@ -683,6 +674,12 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             double v = *p ? 1.0 : 0.0;
             if (v != ParamInterface->getParameterValue(index)) {
                 ParamInterface->setParameterValue(index, v);
+            }
+        }
+        for (auto& [tag, p] : mInportTriggerParams) {
+            for (int32 i = 0; i < p->NumTriggeredInBlock(); i++) {
+                auto frame = (*p)[i];
+                ParamInterface->sendMessage(tag, 0, Converter.convertSampleOffsetToMilliseconds(static_cast<RNBO::SampleOffset>(frame)));
             }
         }
 
