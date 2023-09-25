@@ -30,6 +30,10 @@ public class RNBOMetasound : ModuleRules
 		}
 
 		var exportDir = Path.Combine(PluginDirectory, "Exports");
+        if (!Directory.Exists(exportDir)) {
+            throw new InvalidOperationException("RNBOMetasound cannot build without at least one export in the Exports directory");
+        }
+
 		string rnboDir = null;
 
 		using (StreamWriter writer = new StreamWriter(Path.Combine(PluginDirectory, "Source", "RNBOMetasound", "Private", "RNBOMetasoundGenerated.cpp")))
@@ -47,7 +51,10 @@ public class RNBOMetasound : ModuleRules
 				PrivateIncludePaths.Add(path);
 				//set rnbo dir
 				if (rnboDir == null) {
-					rnboDir = Path.Combine(path, "rnbo");
+                    var p = Path.Combine(path, "rnbo");
+                    if (Directory.Exists(p)) {
+                        rnboDir = p;
+                    }
 				}
 
 				//#include cpp files in export dir
@@ -57,6 +64,10 @@ public class RNBOMetasound : ModuleRules
 				writer.Write(CreateMetaSound(path));
 			}
 		}
+
+        if (rnboDir == null) {
+            throw new InvalidOperationException("RNBOMetasound cannot build without the rnbo/ source directory in at least one of the export directories");
+        }
 
 		ExternalDependencies.Add(templateFile);
 		ExternalDependencies.Add(exportDir);
