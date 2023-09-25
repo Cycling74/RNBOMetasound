@@ -9,6 +9,8 @@
 #include "MetasoundOperatorSettings.h"
 #include "MetasoundDataTypeRegistrationMacro.h"
 
+#include <algorithm>
+
 // Disable constructor pins of triggers
 template <>
 struct Metasound::TEnableConstructorVertex<RNBOMetasound::FMIDIBuffer>

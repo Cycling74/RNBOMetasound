@@ -2,6 +2,7 @@
 
 #include "MetasoundDataTypeRegistrationMacro.h"
 #include "MetasoundParamHelper.h"
+#include <array>
 
 namespace RNBOMetasound {
 
