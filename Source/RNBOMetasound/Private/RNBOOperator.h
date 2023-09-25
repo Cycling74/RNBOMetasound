@@ -35,6 +35,12 @@ static bool IsBoolParam(const RNBO::Json& p)
     return false;
 }
 
+static bool IsFloatParam(const RNBO::Json& p)
+{
+    // TODO, filter out enum and potentially int?
+    return !IsBoolParam(p);
+}
+
 static bool IsInputParam(const RNBO::Json& p)
 {
     if (p["meta"].is_object() && p["meta"]["in"].is_boolean()) {
@@ -248,7 +254,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
     static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputFloatParams()
     {
-        static const auto Params = FRNBOMetasoundParam::NumericParamsFiltered(desc, [](const RNBO::Json& p) -> bool { return IsInputParam(p) && !IsBoolParam(p); });
+        static const auto Params = FRNBOMetasoundParam::NumericParamsFiltered(desc, [](const RNBO::Json& p) -> bool { return IsInputParam(p) && IsFloatParam(p); });
         return Params;
     }
 
@@ -260,7 +266,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
     static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& OutputFloatParams()
     {
-        static const auto Params = FRNBOMetasoundParam::NumericParamsFiltered(desc, [](const RNBO::Json& p) -> bool { return IsOutputParam(p) && !IsBoolParam(p); });
+        static const auto Params = FRNBOMetasoundParam::NumericParamsFiltered(desc, [](const RNBO::Json& p) -> bool { return IsOutputParam(p) && IsFloatParam(p); });
         return Params;
     }
 
