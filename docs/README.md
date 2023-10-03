@@ -10,11 +10,6 @@ As this integration is in an experimental state, so is this documentation, and t
 
 * After you export, you must build your project.
 
-* to recompile/load metasound nodes:
-  * Tools -> Debug -> Modules
-    * search for RNBO then click the appropriate button
-    * note: you must have "Live Coding" disabled 
-
 ## Input and Output Parameters 
 
 You can set whether a parameter of your RNBO patcher will become an input or an output pin using parameter metadata. 
@@ -30,7 +25,10 @@ You can set whether a parameter of your RNBO patcher will become an input or an 
 
 ### Boolean
 
-`[param foo @enum 0 1]` will be treated as a boolean type in the MS graph
+`[param foo @enum 0 1]` will be treated as a boolean type in the MS graph.
+
+![boolean in Max](img/boolean-in-Max.png)
+![boolean in UE](img/boolean-in-UE.png)
 
 ### Trigger
 `[inport bar]` or `[output bar]` will create a `Trigger` input or output pin on the resulting MS node. 
