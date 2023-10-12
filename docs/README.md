@@ -8,20 +8,22 @@ As this integration is in an experimental state, so is this documentation, and t
 
 * When exporting your RNBO C++ source, you can pick an export directory that should have a path like: `/<Your UE Project>/Plugins/RNBOMetasound/Exports/<Your RNBO Device Name>/`
 
-* After you export, you must build your project.
+* After you export, you must build your project. Your UE project should be a C++ project so that you can generate a Visual Studio solution or Xcode project for your game.
 
-## Input and Output Parameters 
+## Generating Pin Types
 
-You can set whether a parameter of your RNBO patcher will become an input or an output pin using parameter metadata. 
+*This section is a stub --*
+
+A RNBO patcher's `parameters` and message `inports` or `outports` can all become pins on the RNBO Metasound node, along with a pin for `MIDI` input/output and for connecting to a `Transport`. Those pins can be input pins, output pins, or both. 
+
+### Input and Output Parameters 
+
+While an `inport` or `midiin` object in the RNBO patcher will necessarily create an input pin, and an `outport` or `midiout` object will create an output pin, parameters are more configurable. You can set whether a parameter of your RNBO patcher will become an input or an output pin using parameter metadata. 
 
 * `[param foo]` will create an input pin
 * `[param foo @meta in:true]` will only create an input pin
 * `[param foo @meta out:true]` will create both an input and an output pin
 * `[param foo @meta in:false,out:true]` will only create an output pin
-
-## Generating Pin Types
-
-*This section is a stub --*
 
 ### Boolean
 
