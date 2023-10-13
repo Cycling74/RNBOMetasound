@@ -12,6 +12,7 @@
 #include "MetasoundPrimitives.h"
 #include "MetasoundParamHelper.h"
 #include "MetasoundVertex.h"
+#include "MetasoundWaveTable.h"
 
 #include "Internationalization/Text.h"
 #include <unordered_map>
@@ -152,6 +153,23 @@ class FRNBOMetasoundParam
         return Signals(desc, "outlets");
     }
 
+    static std::vector<FRNBOMetasoundParam> DataRef(const RNBO::Json& desc)
+    {
+        std::vector<FRNBOMetasoundParam> params;
+        for (auto& p : desc["externalDataRefs"]) {
+            // only supporting buffer~ for now
+            if (p.contains("tag") && p["tag"].get<std::string>() != "buffer~") {
+                continue;
+            }
+            std::string id = p["id"];
+            std::string description = id;
+            std::string displayName = id;
+            params.emplace_back(FString(id.c_str()), FText::AsCultureInvariant(description.c_str()), FText::AsCultureInvariant(displayName.c_str()));
+        }
+
+        return params;
+    }
+
     static bool MIDIIn(const RNBO::Json& desc)
     {
         return desc["numMidiInputPorts"].get<int>() > 0;
@@ -253,6 +271,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     std::unordered_map<RNBO::ParameterIndex, Metasound::FInt32ReadRef> mInputIntParams;
     std::unordered_map<RNBO::ParameterIndex, Metasound::FBoolReadRef> mInputBoolParams;
     std::unordered_map<RNBO::MessageTag, Metasound::FTriggerReadRef> mInportTriggerParams;
+    std::vector<Metasound::FWaveTableBankAssetReadRef> mDataRefParams;
 
     std::vector<Metasound::FAudioBufferReadRef> mInputAudioParams;
     std::vector<const float*> mInputAudioBuffers;
@@ -314,6 +333,12 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam>& InportTrig()
     {
         static const std::unordered_map<RNBO::MessageTag, FRNBOMetasoundParam> Params = FRNBOMetasoundParam::InportTrig(desc);
+        return Params;
+    }
+
+    static const std::vector<FRNBOMetasoundParam>& DataRefParams()
+    {
+        static const std::vector<FRNBOMetasoundParam> Params = FRNBOMetasoundParam::DataRef(desc);
         return Params;
     }
 
@@ -426,6 +451,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                 inputs.Add(TInputDataVertex<bool>(p.Name(), p.MetaData(), p.InitialValue() != 0.0f));
             }
 
+            for (auto& p : DataRefParams()) {
+                inputs.Add(TInputDataVertex<Metasound::FWaveTableBankAsset>(p.Name(), p.MetaData()));
+            }
+
             if (WithTransport()) {
                 inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
             }
@@ -516,6 +545,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             mInputBoolParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, it.second.Name(), InSettings));
         }
 
+        for (auto& p : DataRefParams()) {
+            mDataRefParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<FWaveTableBankAsset>(p.Name()));
+        }
+
         for (auto& p : InputAudioParams()) {
             mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FAudioBuffer>(p.Name(), InSettings));
             mInputAudioBuffers.emplace_back(nullptr);
@@ -598,6 +631,13 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                 if (it != lookup.end()) {
                     InOutVertexData.BindReadVertex(it->second.Name(), p);
                 }
+            }
+        }
+        {
+            auto lookup = DataRefParams();
+            for (size_t i = 0; i < mDataRefParams.size(); i++) {
+                auto& p = lookup[i];
+                InOutVertexData.BindReadVertex(p.Name(), mDataRefParams[i]);
             }
         }
         if (Transport.IsSet()) {
