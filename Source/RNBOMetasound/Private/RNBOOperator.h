@@ -13,6 +13,7 @@
 #include "MetasoundParamHelper.h"
 #include "MetasoundVertex.h"
 #include "MetasoundWaveTable.h"
+#include "MetasoundLog.h"
 
 #include "Internationalization/Text.h"
 #include <unordered_map>
@@ -259,6 +260,7 @@ class FRNBOMetasoundParam
 template <const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr (*FactoryFunction)(RNBO::PlatformInterface* platformInterface)>
 class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>
     , public RNBO::EventHandler
+    , public RNBO::ExternalDataHandler
 {
   private:
     RNBO::CoreObject CoreObject;
@@ -266,6 +268,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     RNBO::ParameterEventInterfaceUniquePtr ParamInterface;
 
     int32 mNumFrames;
+    float mSampleRate;
 
     std::unordered_map<RNBO::ParameterIndex, Metasound::FFloatReadRef> mInputFloatParams;
     std::unordered_map<RNBO::ParameterIndex, Metasound::FInt32ReadRef> mInputIntParams;
@@ -517,6 +520,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         Metasound::FBuildErrorArray& OutErrors)
         : CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())()))
         , mNumFrames(InSettings.GetNumFramesPerBlock())
+        , mSampleRate(InSettings.GetSampleRate())
 
     {
         CoreObject.prepareToProcess(InSettings.GetSampleRate(), InSettings.GetNumFramesPerBlock());
@@ -584,6 +588,8 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         if (WithTransport()) {
             Transport = { InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)) };
         }
+
+        CoreObject.setExternalDataHandler(this);
     }
 
     virtual void BindInputs(Metasound::FInputVertexInterfaceData& InOutVertexData) override
@@ -820,6 +826,48 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         if (MIDIOut.IsSet()) {
             MIDIOut.GetValue()->Reset();
         }
+    }
+
+    virtual void processBeginCallback(RNBO::DataRefIndex numRefs, RNBO::ConstRefList refList, RNBO::UpdateRefCallback updateDataRef, RNBO::ReleaseRefCallback releaseDataRef) override
+    {
+        const auto len = std::min(static_cast<RNBO::ExternalDataIndex>(mDataRefParams.size()), static_cast<RNBO::ExternalDataIndex>(numRefs));
+        for (RNBO::ExternalDataIndex i = 0; i < len; i++) {
+            auto BankProxy = mDataRefParams[i]->GetProxy();
+            auto& ref = refList[i];
+            if (BankProxy.IsValid() && ref->getType().type == RNBO::DataType::Float32AudioBuffer) {
+                const TArray<FWaveTableData>& WaveTableData = BankProxy->GetWaveTableData();
+                if (!WaveTableData.IsEmpty())
+                {
+                    const int32 TableIndex = 0; // TODO?
+                    const FWaveTableData& Entry = WaveTableData[TableIndex];
+                    const int32 NumSamples = Entry.GetNumSamples();
+                    const RNBO::Index channelcount = 1;
+                    const double BankSampleRate = BankProxy->GetSampleMode() == EWaveTableSamplingMode::FixedResolution ? mSampleRate : BankProxy->GetSampleRate();
+
+                    // only supporting float
+                    if (Entry.GetBitDepth() == EWaveTableBitDepth::IEEE_Float) {
+                        auto& raw = Entry.GetRawData();
+                        // XXX RNBO buffers are read+write but we probably don't want to write over this data
+                        char* smps = const_cast<char*>(reinterpret_cast<const char*>(raw.GetData()));
+                        const size_t sizeInBytes = raw.Num();
+
+                        // update!
+                        if (ref->getData() != smps || ref->getSizeInBytes() != sizeInBytes) {
+                            RNBO::Float32AudioBuffer newType(channelcount, BankSampleRate);
+                            updateDataRef(i, smps, sizeInBytes, newType);
+                            // UE_LOG(LogMetaSound, Display, TEXT("updating DataRef"));
+                        }
+                        continue;
+                    }
+                }
+            }
+            releaseDataRef(i);
+        }
+    }
+
+    virtual void processEndCallback(RNBO::DataRefIndex, RNBO::ConstRefList) override
+    {
+        // do nothing
     }
 
     virtual void eventsAvailable()
