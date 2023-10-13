@@ -110,6 +110,7 @@ public class RNBOMetasound : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"SignalProcessing",
+				"WaveTable",
 				//Path.Combine(rnboDir, "RNBO.cpp"),
 				// ... add private dependencies that you statically link with here ...
 			}
