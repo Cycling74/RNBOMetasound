@@ -2,6 +2,10 @@
 
 As this integration is in an experimental state, so is this documentation, and this guide should not be considered an encyclopedic reference, but rather a quick-start with a handful of ways to use this tool.
 
+## Example project 
+
+Further documentation can be found in the form of our demo project. Download [the project here](https://cycling74-assets.nyc3.digitaloceanspaces.com/rnbo/unreal-engine/example-projects/rnbo.metasounds.testproj-10.13.23.zip) and open up its `README.md` to get started.
+
 ## Geting Started
 
 1. You will need to create an `Exports/` directory to hold your RNBO exports. 
