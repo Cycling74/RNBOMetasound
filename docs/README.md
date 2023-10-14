@@ -4,15 +4,11 @@ As this integration is in an experimental state, so is this documentation, and t
 
 ## Geting Started
 
-*This section is a stub --*
-
 * When exporting your RNBO C++ source, you can pick an export directory that should have a path like: `/<Your UE Project>/Plugins/RNBOMetasound/Exports/<Your RNBO Device Name>/`
 
 * After you export, you must build your project. Your UE project should be a C++ project so that you can generate a Visual Studio solution or Xcode project for your game.
 
 ## Generating Pin Types
-
-*This section is a stub --*
 
 A RNBO patcher's `parameters` and message `inports` or `outports` can all become pins on the RNBO Metasound node, along with a pin for `MIDI` input/output and for connecting to a `Transport`. Those pins can be input pins, output pins, or both. 
 
@@ -37,11 +33,37 @@ While an `inport` or `midiin` object in the RNBO patcher will necessarily create
 
 Note that at present, the pin will only output a `Trigger` if the `outport` is set to output a `bang`.
 
+## Utility Nodes
+
+This repository will build a few utility nodes that are designed to help you work with MIDI and RNBO's internal transport. 
+
+### Transport
+
+![transport node](img/transport.png)
+
+The RNBO MetaSound node has an input pin that takes the `Transport` type. The `Transport` node, shown in the image above, allows you to set the BPM, time signature numerator and denominator, and whether the transport is running or not.
+
+### MIDI
+
+![midi pin](img/midi-pin.png)
+
+As stated above, including a `[midiin]` (or `[notein]`) object in your RNBO patch will generate a `MIDI In` input pin on your RNBO node. You can send data to that pin from a `MIDI Out` pin that you create from another export's `[midiout]` object, but there are also two utility nodes that will help you generate and manipulate MIDI in the MetaSounds graph itself.
+
+#### Make Note
+
+![make note and midi merge](img/makenote-merge.png)
+
+The `Make Note` node is very similar to RNBO's `[makenote]` object, but as a MetaSound node, it generates a note-on message from its `Trigger` input pin. Note that the `Duration` pin is of type `Time`.
+
+#### MIDI Merge
+
+Your RNBO patchers (and thus nodes) can be polyphonic. In order to send multiple MIDI note-on messages into a node at the same time, for example, to play a chord, you can use the `MIDI Merge` nodes, which take several MIDI type inputs and output them along a single patch cord. 
+
+The `MIDI Merge` nodes have several versions, which you can select from depending on how many MIDI sources you'd like to merge. 
+
 ## A note on buffers and audio files
 
-## Transport
-
-## MIDI
+At present, external buffers referenced by RNBO patchers are not yet supported in the RNBO-built MetaSound node. 
 
 
 
