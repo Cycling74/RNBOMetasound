@@ -4,9 +4,12 @@ As this integration is in an experimental state, so is this documentation, and t
 
 ## Geting Started
 
-* When exporting your RNBO C++ source, you can pick an export directory that should have a path like: `/<Your UE Project>/Plugins/RNBOMetasound/Exports/<Your RNBO Device Name>/`
-
-* After you export, you must build your project. Your UE project should be a C++ project so that you can generate a Visual Studio solution or Xcode project for your game.
+1. You will need to create an `Exports/` directory to hold your RNBO exports. 
+2. Place `Exports/` inside this repository root directory, with a path like: `/<Your UE Project>/Plugins/RNBOMetasound/Exports/`
+3. Give each RNBO patch a unique `Export Name` and `Classname`
+4. Create a folder inside `Exports/` for each exported RNBO patch, like `Exports/<Your RNBO Device Name>/`
+5. Export your c++ source code export to the folder you create in step 4. 
+6. After you export, you must build your project. Your UE project should be a C++ project so that you can generate a Visual Studio solution or Xcode project for your game.
 
 ## Generating Pin Types
 
