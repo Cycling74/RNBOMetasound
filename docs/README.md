@@ -23,8 +23,7 @@ A RNBO patcher's `parameters` and message `inports` or `outports` can all become
 
 While an `inport` or `midiin` object in the RNBO patcher will necessarily create an input pin, and an `outport` or `midiout` object will create an output pin, parameters are more configurable. You can set whether a parameter of your RNBO patcher will become an input or an output pin using parameter metadata. 
 
-* `[param foo]` will create an input pin
-* `[param foo @meta in:true]` will only create an input pin
+* `[param foo]` or `[param foo @meta in:true]` will only create an input pin
 * `[param foo @meta out:true]` will create both an input and an output pin
 * `[param foo @meta in:false,out:true]` will only create an output pin
 
@@ -56,6 +55,8 @@ The RNBO MetaSound node has an input pin that takes the `Transport` type. The `T
 
 As stated above, including a `[midiin]` (or `[notein]`) object in your RNBO patch will generate a `MIDI In` input pin on your RNBO node. You can send data to that pin from a `MIDI Out` pin that you create from another export's `[midiout]` object, but there are also two utility nodes that will help you generate and manipulate MIDI in the MetaSounds graph itself.
 
+Though there are not yet utility nodes built for this purpose, you can also generate `MIDI In` and `MIDI Out` pins with RNBO's other MIDI input and output objects like `[ctrlin]` or `[ctrlout]`. For example, if you include a `[ctrlout]` object in a RNBO patcher, the node built from that export will be able to send MIDI CC messages into a `MIDI In` pin on a second RNBO node whose export included `[ctrlin]`.
+
 #### Make Note
 
 ![make note and midi merge](img/makenote-merge.png)
@@ -71,6 +72,3 @@ The `MIDI Merge` nodes have several versions, which you can select from dependin
 ## A note on buffers and audio files
 
 At present, external buffers referenced by RNBO patchers are not yet supported in the RNBO-built MetaSound node. 
-
-
-
