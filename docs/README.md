@@ -15,6 +15,10 @@ Further documentation can be found in the form of our demo project. Download [th
 5. Export your c++ source code export to the folder you create in step 4. 
 6. After you export, you must build your project. Your UE project should be a C++ project so that you can generate a Visual Studio solution or Xcode project for your game.
 
+## Naming your RNBO Node
+
+Your RNBO MetaSound node will be named by your top-level `[rnbo~]` object’s `@title` attribute or, if no such value exists, by the `Classname` you’ve defined in the export sidebar.
+
 ## Generating Pin Types
 
 A RNBO patcher's `parameters` and message `inports` or `outports` can all become pins on the RNBO Metasound node, along with a pin for `MIDI` input/output and for connecting to a `Transport`. Those pins can be input pins, output pins, or both. 
