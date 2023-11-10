@@ -18,6 +18,15 @@
 #include "Internationalization/Text.h"
 #include <unordered_map>
 
+#include "DecoderInputFactory.h"
+#include "DSP/BufferVectorOperations.h"
+#include "DSP/ConvertDeinterleave.h"
+#include "DSP/MultichannelBuffer.h"
+#include "DSP/MultichannelLinearResampler.h"
+#include "IAudioCodec.h"
+#include "MetasoundWave.h"
+#include "Sound/SampleBufferIO.h"
+
 namespace RNBOMetasound {
 
 #define LOCTEXT_NAMESPACE "FRNBOMetasoundModule"
@@ -28,6 +37,70 @@ METASOUND_PARAM(ParamMIDIOut, "MIDI Out", "MIDI data output.")
 using Metasound::FDataVertexMetadata;
 
 namespace {
+
+struct WaveAssetDataRef
+{
+    Metasound::FWaveAssetReadRef WaveAsset;
+    FObjectKey WaveAssetProxyKey;
+
+    /*
+    Audio::FAlignedFloatBuffer InterleavedBuffer;
+    Audio::FMultichannelBuffer DeinterleavedBuffer;
+    Audio::FSoundWavePCMLoader Loader;
+
+    TUniquePtr<Audio::IDecoderInput> DecoderInput;
+    TUniquePtr<Audio::IDecoder> Decoder;
+
+    TUniquePtr<::Audio::IConvertDeinterleave> ConvertDeinterleave;
+    */
+
+    WaveAssetDataRef(
+        const TCHAR* Name,
+        const Metasound::FOperatorSettings& InSettings,
+        const Metasound::FDataReferenceCollection& InputCollection)
+        : WaveAsset(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FWaveAsset>(Name))
+    {
+    }
+
+    void Update()
+    {
+        auto WaveProxy = WaveAsset->GetSoundWaveProxy();
+        if (WaveProxy.IsValid()) {
+            auto key = WaveProxy->GetFObjectKey();
+            if (key == WaveAssetProxyKey) {
+                return;
+            }
+            WaveAssetProxyKey = key;
+
+            auto sr = WaveProxy->GetSampleRate();
+            auto chans = WaveProxy->GetNumChannels();
+            auto frames = WaveProxy->GetNumFrames();
+
+            audio::FStreamingWaveData
+
+                if (WaveProxy->LoadZerothChunk())
+            {
+                std::vector<uint8> data;
+                const auto chunks = WaveProxy->GetNumChunks();
+                for (auto i = 0; i < chunks; i++) {
+                    data.resize(WaveProxy->GetSizeOfChunk(i));
+                    if (!WaveProxy->GetChunkData(i, data.data(), true)) {
+                        UE_LOG(LogMetaSound, Display, TEXT("failed to load chunk"));
+                        return;
+                    }
+                }
+                UE_LOG(LogMetaSound, Display, TEXT("LOADED WHOLE SHIT"));
+            }
+            else {
+                UE_LOG(LogMetaSound, Display, TEXT("failed to load 0th chunk"));
+            }
+        }
+        else {
+            WaveAssetProxyKey = FObjectKey();
+        }
+    }
+};
+
 static bool IsBoolParam(const RNBO::Json& p)
 {
     if (p["steps"].get<int>() == 2 && p["enumValues"].is_array()) {
@@ -274,7 +347,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     std::unordered_map<RNBO::ParameterIndex, Metasound::FInt32ReadRef> mInputIntParams;
     std::unordered_map<RNBO::ParameterIndex, Metasound::FBoolReadRef> mInputBoolParams;
     std::unordered_map<RNBO::MessageTag, Metasound::FTriggerReadRef> mInportTriggerParams;
-    std::vector<Metasound::FWaveTableBankAssetReadRef> mDataRefParams;
+    std::vector<WaveAssetDataRef> mDataRefParams;
 
     std::vector<Metasound::FAudioBufferReadRef> mInputAudioParams;
     std::vector<const float*> mInputAudioBuffers;
@@ -455,7 +528,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             }
 
             for (auto& p : DataRefParams()) {
-                inputs.Add(TInputDataVertex<Metasound::FWaveTableBankAsset>(p.Name(), p.MetaData()));
+                inputs.Add(TInputDataVertex<Metasound::FWaveAsset>(p.Name(), p.MetaData()));
             }
 
             if (WithTransport()) {
@@ -550,7 +623,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         }
 
         for (auto& p : DataRefParams()) {
-            mDataRefParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<FWaveTableBankAsset>(p.Name()));
+            mDataRefParams.emplace_back(p.Name(), InSettings, InputCollection);
         }
 
         for (auto& p : InputAudioParams()) {
@@ -643,7 +716,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             auto lookup = DataRefParams();
             for (size_t i = 0; i < mDataRefParams.size(); i++) {
                 auto& p = lookup[i];
-                InOutVertexData.BindReadVertex(p.Name(), mDataRefParams[i]);
+                InOutVertexData.BindReadVertex(p.Name(), mDataRefParams[i].WaveAsset);
             }
         }
         if (Transport.IsSet()) {
@@ -832,36 +905,39 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     {
         const auto len = std::min(static_cast<RNBO::ExternalDataIndex>(mDataRefParams.size()), static_cast<RNBO::ExternalDataIndex>(numRefs));
         for (RNBO::ExternalDataIndex i = 0; i < len; i++) {
-            auto BankProxy = mDataRefParams[i]->GetProxy();
-            auto& ref = refList[i];
-            if (BankProxy.IsValid() && ref->getType().type == RNBO::DataType::Float32AudioBuffer) {
-                const TArray<FWaveTableData>& WaveTableData = BankProxy->GetWaveTableData();
-                if (!WaveTableData.IsEmpty())
-                {
-                    const int32 TableIndex = 0; // TODO?
-                    const FWaveTableData& Entry = WaveTableData[TableIndex];
-                    const int32 NumSamples = Entry.GetNumSamples();
-                    const RNBO::Index channelcount = 1;
-                    const double BankSampleRate = BankProxy->GetSampleMode() == EWaveTableSamplingMode::FixedResolution ? mSampleRate : BankProxy->GetSampleRate();
+            mDataRefParams[i].Update();
+            /*
+              auto BankProxy = mDataRefParams[i]->GetProxy();
+              auto& ref = refList[i];
+              if (BankProxy.IsValid() && ref->getType().type == RNBO::DataType::Float32AudioBuffer) {
+                  const TArray<FWaveTableData>& WaveTableData = BankProxy->GetWaveTableData();
+                  if (!WaveTableData.IsEmpty())
+                  {
+                      const int32 TableIndex = 0; // TODO?
+                      const FWaveTableData& Entry = WaveTableData[TableIndex];
+                      const int32 NumSamples = Entry.GetNumSamples();
+                      const RNBO::Index channelcount = 1;
+                      const double BankSampleRate = BankProxy->GetSampleMode() == EWaveTableSamplingMode::FixedResolution ? mSampleRate : BankProxy->GetSampleRate();
 
-                    // only supporting float
-                    if (Entry.GetBitDepth() == EWaveTableBitDepth::IEEE_Float) {
-                        auto& raw = Entry.GetRawData();
-                        // XXX RNBO buffers are read+write but we probably don't want to write over this data
-                        char* smps = const_cast<char*>(reinterpret_cast<const char*>(raw.GetData()));
-                        const size_t sizeInBytes = raw.Num();
+                      // only supporting float
+                      if (Entry.GetBitDepth() == EWaveTableBitDepth::IEEE_Float) {
+                          auto& raw = Entry.GetRawData();
+                          // XXX RNBO buffers are read+write but we probably don't want to write over this data
+                          char* smps = const_cast<char*>(reinterpret_cast<const char*>(raw.GetData()));
+                          const size_t sizeInBytes = raw.Num();
 
-                        // update!
-                        if (ref->getData() != smps || ref->getSizeInBytes() != sizeInBytes) {
-                            RNBO::Float32AudioBuffer newType(channelcount, BankSampleRate);
-                            updateDataRef(i, smps, sizeInBytes, newType);
-                            // UE_LOG(LogMetaSound, Display, TEXT("updating DataRef"));
-                        }
-                        continue;
-                    }
-                }
-            }
-            releaseDataRef(i);
+                          // update!
+                          if (ref->getData() != smps || ref->getSizeInBytes() != sizeInBytes) {
+                              RNBO::Float32AudioBuffer newType(channelcount, BankSampleRate);
+                              updateDataRef(i, smps, sizeInBytes, newType);
+                              // UE_LOG(LogMetaSound, Display, TEXT("updating DataRef"));
+                          }
+                          continue;
+                      }
+                  }
+              }
+              releaseDataRef(i);
+              */
         }
     }
 
