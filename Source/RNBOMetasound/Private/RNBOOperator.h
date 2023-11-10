@@ -166,7 +166,24 @@ class FRNBOMetasoundParam
         for (auto& p : desc[selector]) {
             if (p.contains("type") && sig.compare(p["type"].get<std::string>()) == 0) {
                 std::string name = p["tag"].get<std::string>();
-                params.emplace_back(FString(name.c_str()), FText::AsCultureInvariant(name.c_str()), FText::AsCultureInvariant(name.c_str()), 0.0f);
+                std::string tooltip = name;
+                std::string displayName = name;
+
+                // read comment and populate displayName if it exists
+                if (p.contains("comment") && p["comment"].is_string()) {
+                    displayName = p["comment"].get<std::string>();
+                }
+                if (p.contains("meta") && p["meta"].is_object()) {
+                    const RNBO::Json& meta = p["meta"];
+                    if (meta.contains("displayname") && meta["displayname"].is_string()) {
+                        displayName = meta["displayname"].get<std::string>();
+                    }
+                    if (meta.contains("tooltip") && meta["tooltip"].is_string()) {
+                        tooltip = meta["tooltip"].get<std::string>();
+                    }
+                }
+
+                params.emplace_back(FString(name.c_str()), FText::AsCultureInvariant(tooltip.c_str()), FText::AsCultureInvariant(displayName.c_str()), 0.0f);
             }
         }
 
