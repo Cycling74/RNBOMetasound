@@ -19,6 +19,14 @@ You can set whether a parameter of your RNBO patcher will become an input or an 
 * `[param foo @meta out:true]` will create both an input and an output pin
 * `[param foo @meta in:false,out:true]` will only create an output pin
 
+## Audio Pin Naming
+
+By default a pin for `[in~ 1]` or `[out~ 2]` will be named "in1" or "out2" but you can override that in 2 ways.
+
+* `[in~ 1 @comment envelope]` will set the pin name to "envelope"
+* `[in~ 1 @meta displayname:'my name']` will set the pin name to "my name"
+* `[in~ 1 @meta tooltip:'this is a tooltip']` will set the pin tooltip to "this is a tooltip"
+
 ## Generating Pin Types
 
 *This section is a stub --*
