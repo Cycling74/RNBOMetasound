@@ -319,8 +319,8 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
     static const bool WithTransport()
     {
-        // TODO config based on description
-        return true;
+        const std::string key = "transportUsed";
+        return !desc.contains(key) || desc[key].get<bool>();
     }
 
     static const bool WithMIDIIn()
