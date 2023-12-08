@@ -272,7 +272,25 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
         FBuildErrorArray& OutErrors)
         : Transport(FTransportWriteRef::CreateNew(false))
     {
-        Reset(InParams);
+        GetEnvInfo(InParams);
+
+        FScopeLock Guard(&GlobalTransportMutex);
+        if (TransportWatchers == 0) {
+            auto device = Device();
+            TransportTimeLast = device ? device->GetAudioClock() : 0.0;
+            UE_LOG(LogMetaSound, Verbose, TEXT("FGlobalTransportOperator setting TransportTimeLast == %f"), TransportTimeLast);
+        }
+        TransportWatchers++;
+    }
+
+    virtual ~FGlobalTransportOperator()
+    {
+        FScopeLock Guard(&GlobalTransportMutex);
+        TransportWatchers--;
+    }
+
+    virtual void BindInputs(FInputVertexInterfaceData& InOutVertexData) override
+    {
     }
 
     virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
@@ -280,32 +298,41 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
         InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransport), Transport);
     }
 
+    FAudioDevice* Device()
+    {
+        FAudioDeviceManager* manager = FAudioDeviceManager::Get();
+        return manager ? manager->GetAudioDeviceRaw(AudioDeviceId) : nullptr;
+    }
+
     void Execute()
     {
+        FAudioDevice* device = Device();
+
         FScopeLock Guard(&GlobalTransportMutex);
         FTransport Cur(TransportRun, TransportBPM, TransportNum, TransportDen);
 
-        if (FAudioDeviceManager* ADM = FAudioDeviceManager::Get())
+        if (device != nullptr)
         {
-            if (FAudioDevice* AudioDevice = ADM->GetAudioDeviceRaw(AudioDeviceId))
-            {
-                auto c = AudioDevice->GetAudioClock();
-                if (c > TransportTimeLast) {
-                    auto diff = c - TransportTimeLast;
-                    TransportTimeLast = c;
-                    if (Cur.GetRun()) {
-                        double PeriodMul = diff * 8.0 / 480.0;
-                        FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
-                        CurTransportBeatTime += offset;
-                    }
+            auto c = device->GetAudioClock();
+            if (c > TransportTimeLast) {
+                auto diff = c - TransportTimeLast;
+                TransportTimeLast = c;
+                if (Cur.GetRun()) {
+                    double PeriodMul = diff * 8.0 / 480.0;
+                    FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
+                    CurTransportBeatTime += offset;
                 }
             }
         }
+        else {
+            UE_LOG(LogMetaSound, Error, TEXT("FGlobalTransportOperator Failed to get audio device"));
+        }
+
         Cur.SetBeatTime(CurTransportBeatTime);
         *Transport = Cur;
     }
 
-    void Reset(const IOperator::FResetParams& InParams)
+    void GetEnvInfo(const IOperator::FResetParams& InParams)
     {
         using namespace Frontend;
 
@@ -313,6 +340,11 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
         {
             AudioDeviceId = InParams.Environment.GetValue<Audio::FDeviceId>(SourceInterface::Environment::DeviceID);
         }
+    }
+
+    void Reset(const IOperator::FResetParams& InParams)
+    {
+        GetEnvInfo(InParams);
     }
 
   private:
@@ -324,6 +356,7 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
     static int32 TransportDen;
     static FTime CurTransportBeatTime;
     static double TransportTimeLast;
+    static uint32 TransportWatchers;
 
     FTransportWriteRef Transport;
 };
@@ -334,6 +367,7 @@ double FGlobalTransportOperator::TransportBPM = 100.0;
 int32 FGlobalTransportOperator::TransportNum = 4.0;
 int32 FGlobalTransportOperator::TransportDen = 4.0;
 double FGlobalTransportOperator::TransportTimeLast = -1.0;
+uint32 FGlobalTransportOperator::TransportWatchers = 0;
 
 using TransportOperatorNode = FGenericNode<FTransportOperator>;
 METASOUND_REGISTER_NODE(TransportOperatorNode)
