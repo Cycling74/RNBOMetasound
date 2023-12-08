@@ -298,9 +298,9 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
                     FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
                     CurTransportBeatTime += offset;
                 }
-                Cur.SetBeatTime(CurTransportBeatTime);
             }
         }
+        Cur.SetBeatTime(CurTransportBeatTime);
         *Transport = Cur;
     }
 
