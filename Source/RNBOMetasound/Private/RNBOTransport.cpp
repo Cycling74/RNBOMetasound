@@ -10,6 +10,10 @@
 #include "MetasoundOperatorSettings.h"
 #include "MetasoundDataTypeRegistrationMacro.h"
 
+#include "AudioDevice.h"
+#include "AudioDeviceManager.h"
+#include "Interfaces/MetasoundFrontendSourceInterface.h"
+
 // Disable constructor pins of triggers
 template <>
 struct Metasound::TEnableConstructorVertex<RNBOMetasound::FTransport>
@@ -94,6 +98,9 @@ METASOUND_PARAM(ParamTransportBPM, "BPM", "The tempo of the transport in beats p
 METASOUND_PARAM(ParamTransportRun, "Run", "The run state of the transport.")
 METASOUND_PARAM(ParamTransportNum, "Numerator", "The transport time signature numerator.")
 METASOUND_PARAM(ParamTransportDen, "Denominator", "The transport time signature denominator.")
+
+FCriticalSection GlobalTransportMutex;
+
 } // namespace
 
 class FTransportOperator : public TExecutableOperator<FTransportOperator>
@@ -156,10 +163,9 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
         const FDataReferenceCollection& InputCollection,
         const FInputVertexInterface& InputInterface,
         FBuildErrorArray& OutErrors)
-        : BlockSize(InSettings.GetNumFramesPerBlock())
-        , SampleRate(static_cast<double>(InSettings.GetSampleRate()))
+        : SampleRate(static_cast<double>(InSettings.GetSampleRate()))
         , BlockPeriod(InSettings.GetNumFramesPerBlock() / InSettings.GetSampleRate())
-        , PeriodMul(8.0 / 480.0 * InSettings.GetNumFramesPerBlock() / InSettings.GetSampleRate())
+        , PeriodMul(8.0 / 480.0 * static_cast<double>(InSettings.GetNumFramesPerBlock()) / static_cast<double>(InSettings.GetSampleRate()))
         , CurTransportBeatTime(0.0)
         , TransportBPM(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
         , TransportRun(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
@@ -185,7 +191,7 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
     void Execute()
     {
         FTransport Cur(*TransportRun, *TransportBPM, *TransportNum, *TransportDen);
-        if (Cur.GetBPM()) {
+        if (Cur.GetRun()) {
             FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
             CurTransportBeatTime += offset;
         }
@@ -194,14 +200,11 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
     }
 
   private:
-    FSampleCount BlockSize;
     FSampleRate SampleRate;
     FTime BlockPeriod;
     double PeriodMul;
 
     FTime CurTransportBeatTime;
-    float LastTransportBPM = 0.0f;
-    bool LastTransportRun = false;
 
     FFloatReadRef TransportBPM;
     FBoolReadRef TransportRun;
@@ -211,8 +214,132 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
     FTransportWriteRef Transport;
 };
 
+class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOperator>
+{
+  public:
+    static const FNodeClassMetadata& GetNodeInfo()
+    {
+        auto InitNodeInfo = []() -> FNodeClassMetadata {
+            FNodeClassMetadata Info;
+
+            Info.ClassName = { TEXT("UE"), TEXT("GlobalTransport"), TEXT("Audio") };
+            Info.MajorVersion = 1;
+            Info.MinorVersion = 0;
+            Info.DisplayName = LOCTEXT("Metasound_GlobalTransportDisplayName", "Global Transport");
+            Info.Description = LOCTEXT("Metasound_GlobalTransportNodeDescription", "Global Transport generator.");
+            Info.Author = PluginAuthor;
+            Info.PromptIfMissing = PluginNodeMissingPrompt;
+            Info.DefaultInterface = GetVertexInterface();
+            Info.CategoryHierarchy = { LOCTEXT("Metasound_GlobalTransportNodeCategory", "Utils") };
+
+            return Info;
+        };
+
+        static const FNodeClassMetadata Info = InitNodeInfo();
+
+        return Info;
+    }
+    static const FVertexInterface& GetVertexInterface()
+    {
+        auto InitVertexInterface = []() -> FVertexInterface {
+            FInputVertexInterface inputs;
+
+            FOutputVertexInterface outputs;
+            outputs.Add(TOutputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
+
+            FVertexInterface Interface(inputs, outputs);
+
+            return Interface;
+        };
+
+        static const FVertexInterface Interface = InitVertexInterface();
+        return Interface;
+    }
+
+    static TUniquePtr<IOperator> CreateOperator(const FCreateOperatorParams& InParams, FBuildErrorArray& OutErrors)
+    {
+        const FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
+        const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
+
+        return MakeUnique<FGlobalTransportOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutErrors);
+    }
+
+    FGlobalTransportOperator(
+        const FCreateOperatorParams& InParams,
+        const FOperatorSettings& InSettings,
+        const FDataReferenceCollection& InputCollection,
+        const FInputVertexInterface& InputInterface,
+        FBuildErrorArray& OutErrors)
+        : Transport(FTransportWriteRef::CreateNew(false))
+    {
+        Reset(InParams);
+    }
+
+    virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
+    {
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransport), Transport);
+    }
+
+    void Execute()
+    {
+        FScopeLock Guard(&GlobalTransportMutex);
+        FTransport Cur(TransportRun, TransportBPM, TransportNum, TransportDen);
+
+        if (FAudioDeviceManager* ADM = FAudioDeviceManager::Get())
+        {
+            if (FAudioDevice* AudioDevice = ADM->GetAudioDeviceRaw(AudioDeviceId))
+            {
+                auto c = AudioDevice->GetAudioClock();
+                if (Cur.GetRun() && c > TransportTimeLast) {
+                    auto diff = c - TransportTimeLast;
+                    TransportTimeLast = c;
+
+                    double PeriodMul = diff * 8.0 / 480.0;
+                    FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
+                    CurTransportBeatTime += offset;
+                }
+                Cur.SetBeatTime(CurTransportBeatTime);
+            }
+        }
+        *Transport = Cur;
+    }
+
+    void Reset(const IOperator::FResetParams& InParams)
+    {
+        using namespace Frontend;
+
+        bool bHasEnvironmentVars = InParams.Environment.Contains<Audio::FDeviceId>(SourceInterface::Environment::DeviceID);
+        if (bHasEnvironmentVars)
+        {
+            AudioDeviceId = InParams.Environment.GetValue<Audio::FDeviceId>(SourceInterface::Environment::DeviceID);
+        }
+    }
+
+  private:
+    Audio::FDeviceId AudioDeviceId = INDEX_NONE;
+
+    static bool TransportRun;
+    static double TransportBPM;
+    static int32 TransportNum;
+    static int32 TransportDen;
+    static FTime CurTransportBeatTime;
+    static double TransportTimeLast;
+
+    FTransportWriteRef Transport;
+};
+
+FTime FGlobalTransportOperator::CurTransportBeatTime(0.0);
+bool FGlobalTransportOperator::TransportRun = true;
+double FGlobalTransportOperator::TransportBPM = 100.0;
+int32 FGlobalTransportOperator::TransportNum = 4.0;
+int32 FGlobalTransportOperator::TransportDen = 4.0;
+double FGlobalTransportOperator::TransportTimeLast = -1.0;
+
 using TransportOperatorNode = FGenericNode<FTransportOperator>;
 METASOUND_REGISTER_NODE(TransportOperatorNode)
+
+using GlobalTransportOperatorNode = FGenericNode<FGlobalTransportOperator>;
+METASOUND_REGISTER_NODE(GlobalTransportOperatorNode)
 } // namespace
 
 #undef LOCTEXT_NAMESPACE
