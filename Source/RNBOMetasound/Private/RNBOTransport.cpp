@@ -308,8 +308,7 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
     {
         using namespace Frontend;
 
-        bool bHasEnvironmentVars = InParams.Environment.Contains<Audio::FDeviceId>(SourceInterface::Environment::DeviceID);
-        if (bHasEnvironmentVars)
+        if (InParams.Environment.Contains<Audio::FDeviceId>(SourceInterface::Environment::DeviceID))
         {
             AudioDeviceId = InParams.Environment.GetValue<Audio::FDeviceId>(SourceInterface::Environment::DeviceID);
         }
