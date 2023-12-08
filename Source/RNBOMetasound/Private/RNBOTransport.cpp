@@ -101,6 +101,14 @@ METASOUND_PARAM(ParamTransportDen, "Denominator", "The transport time signature 
 
 FCriticalSection GlobalTransportMutex;
 
+FTime GlobalTransportBeatTime(0.0);
+bool GlobalTransportRun = true;
+float GlobalTransportBPM = 100.0f;
+int32 GlobalTransportNum = 4.0;
+int32 GlobalTransportDen = 4.0;
+double GlobalTransportTimeLast = -1.0;
+uint32 GlobalTransportWatchers = 0;
+
 } // namespace
 
 class FTransportOperator : public TExecutableOperator<FTransportOperator>
@@ -275,18 +283,18 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
         GetEnvInfo(InParams);
 
         FScopeLock Guard(&GlobalTransportMutex);
-        if (TransportWatchers == 0) {
+        if (GlobalTransportWatchers == 0) {
             auto device = Device();
-            TransportTimeLast = device ? device->GetAudioClock() : 0.0;
-            UE_LOG(LogMetaSound, Verbose, TEXT("FGlobalTransportOperator setting TransportTimeLast == %f"), TransportTimeLast);
+            GlobalTransportTimeLast = device ? device->GetAudioClock() : 0.0;
+            UE_LOG(LogMetaSound, Verbose, TEXT("FGlobalTransportOperator setting TransportTimeLast == %f"), GlobalTransportTimeLast);
         }
-        TransportWatchers++;
+        GlobalTransportWatchers++;
     }
 
     virtual ~FGlobalTransportOperator()
     {
         FScopeLock Guard(&GlobalTransportMutex);
-        TransportWatchers--;
+        GlobalTransportWatchers--;
     }
 
     virtual void BindInputs(FInputVertexInterfaceData& InOutVertexData) override
@@ -309,18 +317,18 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
         FAudioDevice* device = Device();
 
         FScopeLock Guard(&GlobalTransportMutex);
-        FTransport Cur(TransportRun, TransportBPM, TransportNum, TransportDen);
+        FTransport Cur(GlobalTransportRun, GlobalTransportBPM, GlobalTransportNum, GlobalTransportDen);
 
         if (device != nullptr)
         {
             auto c = device->GetAudioClock();
-            if (c > TransportTimeLast) {
-                auto diff = c - TransportTimeLast;
-                TransportTimeLast = c;
+            if (c > GlobalTransportTimeLast) {
+                auto diff = c - GlobalTransportTimeLast;
+                GlobalTransportTimeLast = c;
                 if (Cur.GetRun()) {
                     double PeriodMul = diff * 8.0 / 480.0;
                     FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
-                    CurTransportBeatTime += offset;
+                    GlobalTransportBeatTime += offset;
                 }
             }
         }
@@ -328,7 +336,7 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
             UE_LOG(LogMetaSound, Error, TEXT("FGlobalTransportOperator Failed to get audio device"));
         }
 
-        Cur.SetBeatTime(CurTransportBeatTime);
+        Cur.SetBeatTime(GlobalTransportBeatTime);
         *Transport = Cur;
     }
 
@@ -350,24 +358,8 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
   private:
     Audio::FDeviceId AudioDeviceId = INDEX_NONE;
 
-    static bool TransportRun;
-    static double TransportBPM;
-    static int32 TransportNum;
-    static int32 TransportDen;
-    static FTime CurTransportBeatTime;
-    static double TransportTimeLast;
-    static uint32 TransportWatchers;
-
     FTransportWriteRef Transport;
 };
-
-FTime FGlobalTransportOperator::CurTransportBeatTime(0.0);
-bool FGlobalTransportOperator::TransportRun = true;
-double FGlobalTransportOperator::TransportBPM = 100.0;
-int32 FGlobalTransportOperator::TransportNum = 4.0;
-int32 FGlobalTransportOperator::TransportDen = 4.0;
-double FGlobalTransportOperator::TransportTimeLast = -1.0;
-uint32 FGlobalTransportOperator::TransportWatchers = 0;
 
 using TransportOperatorNode = FGenericNode<FTransportOperator>;
 METASOUND_REGISTER_NODE(TransportOperatorNode)
