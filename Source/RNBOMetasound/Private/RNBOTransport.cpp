@@ -290,13 +290,14 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
             if (FAudioDevice* AudioDevice = ADM->GetAudioDeviceRaw(AudioDeviceId))
             {
                 auto c = AudioDevice->GetAudioClock();
-                if (Cur.GetRun() && c > TransportTimeLast) {
+                if (c > TransportTimeLast) {
                     auto diff = c - TransportTimeLast;
                     TransportTimeLast = c;
-
-                    double PeriodMul = diff * 8.0 / 480.0;
-                    FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
-                    CurTransportBeatTime += offset;
+                    if (Cur.GetRun()) {
+                        double PeriodMul = diff * 8.0 / 480.0;
+                        FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
+                        CurTransportBeatTime += offset;
+                    }
                 }
             }
         }
