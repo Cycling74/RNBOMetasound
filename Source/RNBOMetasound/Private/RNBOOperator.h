@@ -26,6 +26,7 @@
 #include "IAudioCodec.h"
 #include "MetasoundWave.h"
 #include "Sound/SampleBufferIO.h"
+#include "AudioStreaming.h"
 
 namespace RNBOMetasound {
 
@@ -76,18 +77,23 @@ struct WaveAssetDataRef
             auto chans = WaveProxy->GetNumChannels();
             auto frames = WaveProxy->GetNumFrames();
 
-            audio::FStreamingWaveData
-
-                if (WaveProxy->LoadZerothChunk())
+            if (WaveProxy->LoadZerothChunk())
             {
-                std::vector<uint8> data;
-                const auto chunks = WaveProxy->GetNumChunks();
-                for (auto i = 0; i < chunks; i++) {
-                    data.resize(WaveProxy->GetSizeOfChunk(i));
-                    if (!WaveProxy->GetChunkData(i, data.data(), true)) {
+                const auto count = WaveProxy->GetNumChunks();
+                for (auto i = 0; i < count; i++) {
+                    const FStreamedAudioChunk& Chunk = WaveProxy->GetChunk(0);
+
+                    FLoadedAudioChunk Data;
+                    Data.DataSize = Chunk.DataSize;
+                    Data.AudioDataSize = Chunk.AudioDataSize;
+                    if (!WaveProxy->GetChunkData(i, &Data.Data, true)) {
                         UE_LOG(LogMetaSound, Display, TEXT("failed to load chunk"));
+                        FMemory::Free(Data.Data);
+                        Data.Data = nullptr;
                         return;
                     }
+                    FMemory::Free(Data.Data);
+                    Data.Data = nullptr;
                 }
                 UE_LOG(LogMetaSound, Display, TEXT("LOADED WHOLE SHIT"));
             }
