@@ -100,6 +100,9 @@ METASOUND_PARAM(ParamTransportRun, "Run", "The run state of the transport.")
 METASOUND_PARAM(ParamTransportNum, "Numerator", "The transport time signature numerator.")
 METASOUND_PARAM(ParamTransportDen, "Denominator", "The transport time signature denominator.")
 
+METASOUND_PARAM(ParamTransportBeatTime, "BeatTime", "The transport beat time.")
+METASOUND_PARAM(ParamTransportSeek, "Seek", "Read the BeatTime input and jump there.")
+
 FCriticalSection GlobalTransportMutex;
 
 FTime GlobalTransportBeatTime(0.0);
@@ -109,6 +112,7 @@ float GlobalTransportBPM = 100.0f;
 int32 GlobalTransportNum = 4.0;
 int32 GlobalTransportDen = 4.0;
 
+double GlobalTransportNextBeatTime = -1.0;
 bool GlobalTransportNextRun = true;
 float GlobalTransportNextBPM = 100.0f;
 int32 GlobalTransportNextNum = 4.0;
@@ -152,6 +156,8 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
             inputs.Add(TInputDataVertex<bool>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportRun), true));
             inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportNum), 4));
             inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportDen), 4));
+            inputs.Add(TInputDataVertex<FTime>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBeatTime), 0.0f));
+            inputs.Add(TInputDataVertex<FTrigger>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportSeek)));
 
             FOutputVertexInterface outputs;
             outputs.Add(TOutputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
@@ -179,14 +185,14 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
         const FDataReferenceCollection& InputCollection,
         const FInputVertexInterface& InputInterface,
         FBuildErrorArray& OutErrors)
-        : SampleRate(static_cast<double>(InSettings.GetSampleRate()))
-        , BlockPeriod(InSettings.GetNumFramesPerBlock() / InSettings.GetSampleRate())
-        , PeriodMul(8.0 / 480.0 * static_cast<double>(InSettings.GetNumFramesPerBlock()) / static_cast<double>(InSettings.GetSampleRate()))
+        : PeriodMul(8.0 / 480.0 * static_cast<double>(InSettings.GetNumFramesPerBlock()) / static_cast<double>(InSettings.GetSampleRate()))
         , CurTransportBeatTime(0.0)
         , TransportBPM(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
         , TransportRun(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
         , TransportNum(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
         , TransportDen(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
+        , TransportBeatTime(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<FTime>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), InSettings))
+        , TransportSeek(InputCollection.GetDataReadReferenceOrConstruct<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
         , Transport(FTransportWriteRef::CreateNew(false))
     {
     }
@@ -197,6 +203,8 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
         InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportRun), TransportRun);
         InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportNum), TransportNum);
         InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportDen), TransportDen);
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), TransportBeatTime);
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportSeek), TransportSeek);
     }
 
     virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
@@ -207,7 +215,11 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
     void Execute()
     {
         FTransport Cur(*TransportRun, *TransportBPM, *TransportNum, *TransportDen);
-        if (Cur.GetRun()) {
+        // seek or advance
+        if (TransportSeek->IsTriggeredInBlock()) {
+            CurTransportBeatTime = FTime::FromSeconds(std::max(0.0, TransportBeatTime->GetSeconds()));
+        }
+        else if (Cur.GetRun()) {
             FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
             CurTransportBeatTime += offset;
         }
@@ -216,8 +228,6 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
     }
 
   private:
-    FSampleRate SampleRate;
-    FTime BlockPeriod;
     double PeriodMul;
 
     FTime CurTransportBeatTime;
@@ -226,6 +236,9 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
     FBoolReadRef TransportRun;
     FInt32ReadRef TransportNum;
     FInt32ReadRef TransportDen;
+
+    FTimeReadRef TransportBeatTime;
+    FTriggerReadRef TransportSeek;
 
     FTransportWriteRef Transport;
 };
@@ -340,12 +353,19 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
 
                 Cur = { GlobalTransportRun, GlobalTransportBPM, GlobalTransportNum, GlobalTransportDen };
 
-                auto diff = c - GlobalTransportTimeLast;
-                GlobalTransportTimeLast = c;
-                if (Cur.GetRun()) {
-                    double PeriodMul = diff * 8.0 / 480.0;
-                    FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
-                    GlobalTransportBeatTime += offset;
+                // seek or advance
+                if (GlobalTransportNextBeatTime >= 0.0) {
+                    GlobalTransportBeatTime = FTime::FromSeconds(GlobalTransportNextBeatTime);
+                    GlobalTransportNextBeatTime = -1.0;
+                }
+                else {
+                    auto diff = c - GlobalTransportTimeLast;
+                    GlobalTransportTimeLast = c;
+                    if (Cur.GetRun()) {
+                        double PeriodMul = diff * 8.0 / 480.0;
+                        FTime offset(PeriodMul * static_cast<double>(Cur.GetBPM()));
+                        GlobalTransportBeatTime += offset;
+                    }
                 }
             }
         }
@@ -412,6 +432,8 @@ class FGlobalTransportControlOperator : public TExecutableOperator<FGlobalTransp
             inputs.Add(TInputDataVertex<bool>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportRun), true));
             inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportNum), 4));
             inputs.Add(TInputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportDen), 4));
+            inputs.Add(TInputDataVertex<FTime>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBeatTime), 0.0f));
+            inputs.Add(TInputDataVertex<FTrigger>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportSeek)));
 
             FOutputVertexInterface outputs;
 
@@ -443,6 +465,8 @@ class FGlobalTransportControlOperator : public TExecutableOperator<FGlobalTransp
         , TransportRun(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
         , TransportNum(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
         , TransportDen(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
+        , TransportBeatTime(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<FTime>(InputInterface, METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), InSettings))
+        , TransportSeek(InputCollection.GetDataReadReferenceOrConstruct<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
     {
     }
 
@@ -453,6 +477,8 @@ class FGlobalTransportControlOperator : public TExecutableOperator<FGlobalTransp
         InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportRun), TransportRun);
         InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportNum), TransportNum);
         InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportDen), TransportDen);
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), TransportBeatTime);
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportSeek), TransportSeek);
     }
 
     virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
@@ -461,14 +487,22 @@ class FGlobalTransportControlOperator : public TExecutableOperator<FGlobalTransp
 
     void Execute()
     {
-        if (LatchTrigger->IsTriggeredInBlock())
+        auto latch = LatchTrigger->IsTriggeredInBlock();
+        auto seek = TransportSeek->IsTriggeredInBlock();
+        if (latch || seek)
         {
             FScopeLock Guard(&GlobalTransportMutex);
 
-            GlobalTransportNextRun = *TransportRun;
-            GlobalTransportNextBPM = std::max(*TransportBPM, 0.0f);
-            GlobalTransportNextNum = std::max(*TransportNum, 1);
-            GlobalTransportNextDen = std::max(*TransportDen, 1);
+            if (seek) {
+                GlobalTransportNextBeatTime = std::max(0.0, TransportBeatTime->GetSeconds());
+            }
+
+            if (latch) {
+                GlobalTransportNextRun = *TransportRun;
+                GlobalTransportNextBPM = std::max(*TransportBPM, 0.0f);
+                GlobalTransportNextNum = std::max(*TransportNum, 1);
+                GlobalTransportNextDen = std::max(*TransportDen, 1);
+            }
         }
     }
 
@@ -478,6 +512,9 @@ class FGlobalTransportControlOperator : public TExecutableOperator<FGlobalTransp
     FBoolReadRef TransportRun;
     FInt32ReadRef TransportNum;
     FInt32ReadRef TransportDen;
+
+    FTimeReadRef TransportBeatTime;
+    FTriggerReadRef TransportSeek;
 };
 
 using TransportOperatorNode = FGenericNode<FTransportOperator>;
