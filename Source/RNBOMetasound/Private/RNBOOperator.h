@@ -44,6 +44,8 @@ struct WaveAssetDataRef
     Metasound::FWaveAssetReadRef WaveAsset;
     FObjectKey WaveAssetProxyKey;
 
+    std::vector<float> Samples;
+
     /*
     Audio::FAlignedFloatBuffer InterleavedBuffer;
     Audio::FMultichannelBuffer DeinterleavedBuffer;
@@ -73,15 +75,22 @@ struct WaveAssetDataRef
             }
             WaveAssetProxyKey = key;
 
-            auto sr = WaveProxy->GetSampleRate();
-            auto chans = WaveProxy->GetNumChannels();
-            auto frames = WaveProxy->GetNumFrames();
+            float sr = WaveProxy->GetSampleRate();
+            int32 chans = WaveProxy->GetNumChannels();
+            int32 frames = WaveProxy->GetNumFrames();
+            double duration = WaveProxy->GetDuration();
+
+            UE_LOG(LogMetaSound, Display, TEXT("WaveProxy sr: %f chans: %d frames: %d dur: %f"), sr, chans, frames, duration);
+
+            Samples.resize(chans * frames);
 
             if (WaveProxy->LoadZerothChunk())
             {
                 const auto count = WaveProxy->GetNumChunks();
+                unsigned int frame = 0;
+
                 for (auto i = 0; i < count; i++) {
-                    const FStreamedAudioChunk& Chunk = WaveProxy->GetChunk(0);
+                    const FStreamedAudioChunk& Chunk = WaveProxy->GetChunk(i);
 
                     FLoadedAudioChunk Data;
                     Data.DataSize = Chunk.DataSize;
@@ -92,6 +101,8 @@ struct WaveAssetDataRef
                         Data.Data = nullptr;
                         return;
                     }
+
+                    UE_LOG(LogMetaSound, Display, TEXT("Chunk %d DataSize %d AudioDataSize %d"), i, Chunk.DataSize, Chunk.AudioDataSize);
                     FMemory::Free(Data.Data);
                     Data.Data = nullptr;
                 }
