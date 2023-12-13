@@ -28,6 +28,9 @@
 #include "Sound/SampleBufferIO.h"
 #include "AudioStreaming.h"
 
+#include "AudioDecompress.h"
+#include "Interfaces/IAudioFormat.h"
+
 namespace RNBOMetasound {
 
 #define LOCTEXT_NAMESPACE "FRNBOMetasoundModule"
@@ -44,18 +47,11 @@ struct WaveAssetDataRef
     Metasound::FWaveAssetReadRef WaveAsset;
     FObjectKey WaveAssetProxyKey;
 
-    std::vector<float> Samples;
-
-    /*
-    Audio::FAlignedFloatBuffer InterleavedBuffer;
-    Audio::FMultichannelBuffer DeinterleavedBuffer;
-    Audio::FSoundWavePCMLoader Loader;
-
-    TUniquePtr<Audio::IDecoderInput> DecoderInput;
-    TUniquePtr<Audio::IDecoder> Decoder;
-
-    TUniquePtr<::Audio::IConvertDeinterleave> ConvertDeinterleave;
-    */
+    TArray<float> Samples;
+    char* DataPtr = nullptr;
+    double SampleRate = 0.0;
+    RNBO::Index ChannelCount = 0;
+    size_t SizeInBytes = 0;
 
     WaveAssetDataRef(
         const TCHAR* Name,
@@ -65,56 +61,74 @@ struct WaveAssetDataRef
     {
     }
 
-    void Update()
+    bool Update()
     {
         auto WaveProxy = WaveAsset->GetSoundWaveProxy();
         if (WaveProxy.IsValid()) {
             auto key = WaveProxy->GetFObjectKey();
             if (key == WaveAssetProxyKey) {
-                return;
+                return false;
             }
             WaveAssetProxyKey = key;
+            SizeInBytes = 0;
+            DataPtr = nullptr;
 
             float sr = WaveProxy->GetSampleRate();
             int32 chans = WaveProxy->GetNumChannels();
             int32 frames = WaveProxy->GetNumFrames();
             double duration = WaveProxy->GetDuration();
 
-            UE_LOG(LogMetaSound, Display, TEXT("WaveProxy sr: %f chans: %d frames: %d dur: %f"), sr, chans, frames, duration);
+            FName Format = WaveProxy->GetRuntimeFormat();
+            IAudioInfoFactory* Factory = IAudioInfoFactoryRegistry::Get().Find(Format);
+            if (Factory == nullptr) {
+                UE_LOG(LogMetaSound, Error, TEXT("IAudioInfoFactoryRegistry::Get().Find(%s) failed"), Format);
+                return false;
+            }
 
-            Samples.resize(chans * frames);
+            ICompressedAudioInfo* Decompress = Factory->Create();
+            FSoundQualityInfo quality;
+            if (WaveProxy->IsStreaming()) {
+                if (Decompress->StreamCompressedInfo(WaveProxy, &quality)) {
 
-            if (WaveProxy->LoadZerothChunk())
-            {
-                const auto count = WaveProxy->GetNumChunks();
-                unsigned int frame = 0;
+                    // XXX takes too much time!
+                    UE_LOG(LogMetaSound, Display, TEXT("RNBO Decompressing Data"));
+                    TArray<uint8> Buf;
+                    Buf.Empty(quality.SampleDataSize);
+                    Buf.AddZeroed(quality.SampleDataSize);
+                    Decompress->ExpandFile(Buf.GetData(), &quality);
+                    UE_LOG(LogMetaSound, Display, TEXT("RNBO Decompressed Data DONE"));
 
-                for (auto i = 0; i < count; i++) {
-                    const FStreamedAudioChunk& Chunk = WaveProxy->GetChunk(i);
+                    TArrayView<const int16> Data(reinterpret_cast<const int16*>(Buf.GetData()), Buf.Num() / sizeof(int16));
+                    Samples.Empty(Data.Num());
+                    Samples.AddZeroed(Data.Num());
 
-                    FLoadedAudioChunk Data;
-                    Data.DataSize = Chunk.DataSize;
-                    Data.AudioDataSize = Chunk.AudioDataSize;
-                    if (!WaveProxy->GetChunkData(i, &Data.Data, true)) {
-                        UE_LOG(LogMetaSound, Display, TEXT("failed to load chunk"));
-                        FMemory::Free(Data.Data);
-                        Data.Data = nullptr;
-                        return;
+                    /*
+                    const float div = static_cast<float>(INT16_MAX);
+                    for (auto i = 0; i < Data.Num(); i++) {
+                      Samples[i] = static_cast<float>(Data[i]) / div;
                     }
-
-                    UE_LOG(LogMetaSound, Display, TEXT("Chunk %d DataSize %d AudioDataSize %d"), i, Chunk.DataSize, Chunk.AudioDataSize);
-                    FMemory::Free(Data.Data);
-                    Data.Data = nullptr;
+                    SizeInBytes = Buf.Num();
+                    SampleRate = sr;
+                    ChannelCount = chans;
+                    DataPtr = reinterpret_cast<char *>(Samples.GetData());
+                    return true;
+                    */
+                    return false;
                 }
-                UE_LOG(LogMetaSound, Display, TEXT("LOADED WHOLE SHIT"));
+                else {
+                    UE_LOG(LogMetaSound, Display, TEXT("StreamCompressedInfo failed"));
+                }
             }
             else {
-                UE_LOG(LogMetaSound, Display, TEXT("failed to load 0th chunk"));
+                UE_LOG(LogMetaSound, Display, TEXT("StreamCompressedInfo Not streaming"));
             }
         }
         else {
             WaveAssetProxyKey = FObjectKey();
+            SizeInBytes = 0;
+            DataPtr = nullptr;
         }
+        return false;
     }
 };
 
@@ -922,7 +936,13 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     {
         const auto len = std::min(static_cast<RNBO::ExternalDataIndex>(mDataRefParams.size()), static_cast<RNBO::ExternalDataIndex>(numRefs));
         for (RNBO::ExternalDataIndex i = 0; i < len; i++) {
-            mDataRefParams[i].Update();
+            auto& param = mDataRefParams[i];
+            if (param.Update()) {
+                RNBO::Float32AudioBuffer newType(param.ChannelCount, param.SampleRate);
+                updateDataRef(i, param.DataPtr, param.SizeInBytes, newType);
+                UE_LOG(LogMetaSound, Display, TEXT("RNBO::processBeginCallback updating DataRef"));
+            }
+
             /*
               auto BankProxy = mDataRefParams[i]->GetProxy();
               auto& ref = refList[i];
