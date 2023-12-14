@@ -37,7 +37,7 @@ static bool IsBoolParam(const RNBO::Json& p)
 
 static bool IsIntParam(const RNBO::Json& p)
 {
-    return !IsBoolParam(p) && p["enumValues"].is_array();
+    return !IsBoolParam(p) && p["isEnum"].get<bool>();
 }
 
 static bool IsFloatParam(const RNBO::Json& p)
