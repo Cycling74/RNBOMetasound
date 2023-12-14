@@ -53,6 +53,7 @@ struct WaveAssetDataRef
     Metasound::FWaveAssetReadRef WaveAsset;
     FObjectKey WaveAssetProxyKey;
     UE::Tasks::FTask Task;
+    TArray<UE::Tasks::FTask> Cleanup; // make sure not to leave running tasks dangling
 
     WaveAssetDataRef(
         RNBO::CoreObject& coreObject,
@@ -68,7 +69,12 @@ struct WaveAssetDataRef
 
     ~WaveAssetDataRef()
     {
-        // TODO wait on task?
+        Cleanup.Push(Task);
+        for (auto& t : Cleanup) {
+            if (t.IsValid() && !t.IsCompleted()) {
+                t.BusyWait();
+            }
+        }
     }
 
     void Update()
@@ -80,6 +86,12 @@ struct WaveAssetDataRef
                 return;
             }
             WaveAssetProxyKey = key;
+
+            // TODO remove completed tasks from Cleanup
+
+            if (Task.IsValid() && !Task.IsCompleted()) {
+                Cleanup.Push(Task);
+            }
 
             Task = AsyncTaskPipe.Launch(
                 UE_SOURCE_LOCATION,
