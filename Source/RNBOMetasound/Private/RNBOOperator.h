@@ -88,6 +88,7 @@ struct WaveAssetDataRef
             WaveAssetProxyKey = key;
 
             // TODO remove completed tasks from Cleanup
+            // TODO optionally release the existing dataref from the core object to reduce memory usage?
 
             if (Task.IsValid() && !Task.IsCompleted()) {
                 Cleanup.Push(Task);
