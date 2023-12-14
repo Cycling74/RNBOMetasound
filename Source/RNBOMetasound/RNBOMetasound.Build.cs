@@ -98,6 +98,7 @@ public class RNBOMetasound : ModuleRules
 				"MetasoundFrontend",
 				"MetasoundGraphCore",
 				"MetasoundStandardNodes",
+				"MetasoundEngine",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -109,7 +110,7 @@ public class RNBOMetasound : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"SignalProcessing",
-				//Path.Combine(rnboDir, "RNBO.cpp"),
+				"WaveTable",
 				// ... add private dependencies that you statically link with here ...
 			}
 			);
