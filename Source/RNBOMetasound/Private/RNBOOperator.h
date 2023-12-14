@@ -30,6 +30,7 @@
 
 #include "AudioDecompress.h"
 #include "Interfaces/IAudioFormat.h"
+#include "Tasks/Pipe.h"
 
 namespace RNBOMetasound {
 
@@ -42,93 +43,105 @@ using Metasound::FDataVertexMetadata;
 
 namespace {
 
+UE::Tasks::FPipe AsyncTaskPipe{ TEXT("RNBODatarefLoader") };
+
 struct WaveAssetDataRef
 {
+    RNBO::CoreObject& CoreObject;
+    const char* Id;
+    RNBO::DataRefIndex Index;
     Metasound::FWaveAssetReadRef WaveAsset;
     FObjectKey WaveAssetProxyKey;
-
-    TArray<float> Samples;
-    char* DataPtr = nullptr;
-    double SampleRate = 0.0;
-    RNBO::Index ChannelCount = 0;
-    size_t SizeInBytes = 0;
+    UE::Tasks::FTask Task;
 
     WaveAssetDataRef(
+        RNBO::CoreObject& coreObject,
+        const char* id,
         const TCHAR* Name,
         const Metasound::FOperatorSettings& InSettings,
         const Metasound::FDataReferenceCollection& InputCollection)
-        : WaveAsset(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FWaveAsset>(Name))
+        : CoreObject(coreObject)
+        , Id(id)
+        , WaveAsset(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FWaveAsset>(Name))
     {
     }
 
-    bool Update()
+    ~WaveAssetDataRef()
+    {
+        // TODO wait on task?
+    }
+
+    void Update()
     {
         auto WaveProxy = WaveAsset->GetSoundWaveProxy();
         if (WaveProxy.IsValid()) {
             auto key = WaveProxy->GetFObjectKey();
             if (key == WaveAssetProxyKey) {
-                return false;
+                return;
             }
             WaveAssetProxyKey = key;
-            SizeInBytes = 0;
-            DataPtr = nullptr;
 
-            float sr = WaveProxy->GetSampleRate();
-            int32 chans = WaveProxy->GetNumChannels();
-            int32 frames = WaveProxy->GetNumFrames();
-            double duration = WaveProxy->GetDuration();
+            Task = AsyncTaskPipe.Launch(
+                UE_SOURCE_LOCATION,
+                [this, WaveProxy]() {
+                    double sr = WaveProxy->GetSampleRate();
+                    size_t chans = WaveProxy->GetNumChannels();
+                    // int32 frames = WaveProxy->GetNumFrames();
+                    // double duration = WaveProxy->GetDuration();
 
-            FName Format = WaveProxy->GetRuntimeFormat();
-            IAudioInfoFactory* Factory = IAudioInfoFactoryRegistry::Get().Find(Format);
-            if (Factory == nullptr) {
-                UE_LOG(LogMetaSound, Error, TEXT("IAudioInfoFactoryRegistry::Get().Find(%s) failed"), Format);
-                return false;
-            }
+                    FName Format = WaveProxy->GetRuntimeFormat();
+                    IAudioInfoFactory* Factory = IAudioInfoFactoryRegistry::Get().Find(Format);
+                    if (Factory == nullptr) {
+                        UE_LOG(LogMetaSound, Error, TEXT("IAudioInfoFactoryRegistry::Get().Find(%s) failed"), Format);
+                        return;
+                    }
 
-            ICompressedAudioInfo* Decompress = Factory->Create();
-            FSoundQualityInfo quality;
-            if (WaveProxy->IsStreaming()) {
-                if (Decompress->StreamCompressedInfo(WaveProxy, &quality)) {
-
-                    // XXX takes too much time!
-                    UE_LOG(LogMetaSound, Display, TEXT("RNBO Decompressing Data"));
+                    ICompressedAudioInfo* Decompress = Factory->Create();
+                    FSoundQualityInfo quality;
                     TArray<uint8> Buf;
-                    Buf.Empty(quality.SampleDataSize);
-                    Buf.AddZeroed(quality.SampleDataSize);
-                    Decompress->ExpandFile(Buf.GetData(), &quality);
-                    UE_LOG(LogMetaSound, Display, TEXT("RNBO Decompressed Data DONE"));
+                    int32 ValidBytes = 0;
+                    if (WaveProxy->IsStreaming()) {
+                        if (!Decompress->StreamCompressedInfo(WaveProxy, &quality)) {
+                            UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to get compressed stream info"));
+                            return;
+                        }
+                        Buf.AddZeroed(quality.SampleDataSize);
+                        Decompress->StreamCompressedData(Buf.GetData(), false, Buf.Num(), ValidBytes);
+                    }
+                    else {
+                        if (!Decompress->ReadCompressedInfo(WaveProxy->GetResourceData(), WaveProxy->GetResourceSize(), &quality)) {
+                            UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to get compressed info"));
+                            return;
+                        }
+                        Buf.AddZeroed(quality.SampleDataSize);
+                        if (Decompress->ReadCompressedData(Buf.GetData(), false, Buf.Num())) {
+                            ValidBytes = Buf.Num();
+                        }
+                        else {
+                            UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to read compressed data"));
+                            return;
+                        }
+                    }
 
                     TArrayView<const int16> Data(reinterpret_cast<const int16*>(Buf.GetData()), Buf.Num() / sizeof(int16));
-                    Samples.Empty(Data.Num());
-                    Samples.AddZeroed(Data.Num());
 
-                    /*
+                    TSharedPtr<TArray<float>> Samples(new TArray<float>());
+                    Samples->Reserve(Data.Num());
+
                     const float div = static_cast<float>(INT16_MAX);
                     for (auto i = 0; i < Data.Num(); i++) {
-                      Samples[i] = static_cast<float>(Data[i]) / div;
+                        Samples->Push(static_cast<float>(Data[i]) / div);
                     }
-                    SizeInBytes = Buf.Num();
-                    SampleRate = sr;
-                    ChannelCount = chans;
-                    DataPtr = reinterpret_cast<char *>(Samples.GetData());
-                    return true;
-                    */
-                    return false;
-                }
-                else {
-                    UE_LOG(LogMetaSound, Display, TEXT("StreamCompressedInfo failed"));
-                }
-            }
-            else {
-                UE_LOG(LogMetaSound, Display, TEXT("StreamCompressedInfo Not streaming"));
-            }
+                    size_t SizeInBytes = Buf.Num();
+                    char* DataPtr = reinterpret_cast<char*>(Samples->GetData());
+
+                    RNBO::Float32AudioBuffer bufferType(chans, sr);
+                    CoreObject.setExternalData(Id, DataPtr, sizeof(float) * static_cast<size_t>(Samples->Num()), bufferType, [Samples](RNBO::ExternalDataId, char*) mutable {
+                        Samples.Reset();
+                    });
+                },
+                UE::Tasks::ETaskPriority::BackgroundNormal);
         }
-        else {
-            WaveAssetProxyKey = FObjectKey();
-            SizeInBytes = 0;
-            DataPtr = nullptr;
-        }
-        return false;
     }
 };
 
@@ -364,7 +377,6 @@ class FRNBOMetasoundParam
 template <const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr (*FactoryFunction)(RNBO::PlatformInterface* platformInterface)>
 class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>
     , public RNBO::EventHandler
-    , public RNBO::ExternalDataHandler
 {
   private:
     RNBO::CoreObject CoreObject;
@@ -632,7 +644,6 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         ParamInterface = CoreObject.createParameterInterface(RNBO::ParameterEventInterface::SingleProducer, this);
 
         // INPUTS
-
         for (auto& it : InportTrig()) {
             mInportTriggerParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstruct<Metasound::FTrigger>(it.second.Name(), InSettings));
         }
@@ -653,8 +664,12 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             mInputBoolParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, it.second.Name(), InSettings));
         }
 
-        for (auto& p : DataRefParams()) {
-            mDataRefParams.emplace_back(p.Name(), InSettings, InputCollection);
+        {
+            RNBO::DataRefIndex index = 0;
+            for (auto& p : DataRefParams()) {
+                auto id = CoreObject.getExternalDataId(index++);
+                mDataRefParams.emplace_back(CoreObject, id, p.Name(), InSettings, InputCollection);
+            }
         }
 
         for (auto& p : InputAudioParams()) {
@@ -692,8 +707,6 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         if (WithTransport()) {
             Transport = { InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)) };
         }
-
-        CoreObject.setExternalDataHandler(this);
     }
 
     virtual void BindInputs(Metasound::FInputVertexInterfaceData& InOutVertexData) override
@@ -917,6 +930,9 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                 ParamInterface->sendMessage(tag, 0, Converter.convertSampleOffsetToMilliseconds(static_cast<RNBO::SampleOffset>(frame)));
             }
         }
+        for (auto& p : mDataRefParams) {
+            p.Update();
+        }
 
         CoreObject.process(static_cast<const float* const*>(mInputAudioBuffers.data()), mInputAudioBuffers.size(), mOutputAudioBuffers.data(), mOutputAudioBuffers.size(), mNumFrames);
     }
@@ -932,6 +948,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         }
     }
 
+#if 0
     virtual void processBeginCallback(RNBO::DataRefIndex numRefs, RNBO::ConstRefList refList, RNBO::UpdateRefCallback updateDataRef, RNBO::ReleaseRefCallback releaseDataRef) override
     {
         const auto len = std::min(static_cast<RNBO::ExternalDataIndex>(mDataRefParams.size()), static_cast<RNBO::ExternalDataIndex>(numRefs));
@@ -982,6 +999,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     {
         // do nothing
     }
+#endif
 
     virtual void eventsAvailable()
     {
