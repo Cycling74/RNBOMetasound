@@ -426,6 +426,12 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
     int32 LastTransportNum = 0;
     int32 LastTransportDen = 0;
 
+    static const size_t ParamCount()
+    {
+        static const auto count = FRNBOMetasoundParam::NumericParamsFiltered(desc, [](const RNBO::Json& p) -> bool { return true; }).size();
+        return count;
+    }
+
     static const std::unordered_map<RNBO::ParameterIndex, FRNBOMetasoundParam>& InputFloatParams()
     {
         static const auto Params = FRNBOMetasoundParam::NumericParamsFiltered(desc, [](const RNBO::Json& p) -> bool { return IsInputParam(p) && IsFloatParam(p); });
@@ -559,28 +565,55 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         auto Init = []() -> Metasound::FVertexInterface {
             Metasound::FInputVertexInterface inputs;
 
-            for (auto& it : InportTrig()) {
-                auto& p = it.second;
-                inputs.Add(TInputDataVertex<Metasound::FTrigger>(p.Name(), p.MetaData()));
+            /*
+             * https://github.com/Cycling74/RNBOMetasound/issues/25
+             *  audio
+             *  midi
+             *  trigger
+             *  params (sorted by param index)
+             *  wave
+             *  transport
+             */
+
+            for (auto& p : InputAudioParams()) {
+                inputs.Add(TInputDataVertex<Metasound::FAudioBuffer>(p.Name(), p.MetaData()));
             }
 
             if (WithMIDIIn()) {
                 inputs.Add(TInputDataVertex<FMIDIBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamMIDIIn)));
             }
 
-            for (auto& it : InputFloatParams()) {
+            for (auto& it : InportTrig()) {
                 auto& p = it.second;
-                inputs.Add(TInputDataVertex<float>(p.Name(), p.MetaData(), p.InitialValue()));
+                inputs.Add(TInputDataVertex<Metasound::FTrigger>(p.Name(), p.MetaData()));
             }
 
-            for (auto& it : InputIntParams()) {
-                auto& p = it.second;
-                inputs.Add(TInputDataVertex<int32>(p.Name(), p.MetaData(), p.InitialValue()));
-            }
-
-            for (auto& it : InputBoolParams()) {
-                auto& p = it.second;
-                inputs.Add(TInputDataVertex<bool>(p.Name(), p.MetaData(), p.InitialValue() != 0.0f));
+            // add params in order
+            {
+                auto& lookupFloat = InputFloatParams();
+                auto& lookupInt = InputIntParams();
+                auto& lookupBool = InputBoolParams();
+                auto count = ParamCount();
+                for (auto i = 0; i < count; i++) {
+                    auto it = lookupFloat.find(i);
+                    if (it != lookupFloat.end()) {
+                        auto& p = it->second;
+                        inputs.Add(TInputDataVertex<float>(p.Name(), p.MetaData(), p.InitialValue()));
+                        continue;
+                    }
+                    it = lookupInt.find(i);
+                    if (it != lookupInt.end()) {
+                        auto& p = it->second;
+                        inputs.Add(TInputDataVertex<int32>(p.Name(), p.MetaData(), p.InitialValue()));
+                        continue;
+                    }
+                    it = lookupBool.find(i);
+                    if (it != lookupBool.end()) {
+                        auto& p = it->second;
+                        inputs.Add(TInputDataVertex<bool>(p.Name(), p.MetaData(), p.InitialValue() != 0.0f));
+                        continue;
+                    }
+                }
             }
 
             for (auto& p : DataRefParams()) {
@@ -591,38 +624,47 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                 inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
             }
 
-            for (auto& p : InputAudioParams()) {
-                inputs.Add(TInputDataVertex<Metasound::FAudioBuffer>(p.Name(), p.MetaData()));
-            }
-
             Metasound::FOutputVertexInterface outputs;
 
-            for (auto& it : OutportTrig()) {
-                auto& p = it.second;
-                outputs.Add(TOutputDataVertex<Metasound::FTrigger>(p.Name(), p.MetaData()));
+            for (auto& p : OutputAudioParams()) {
+                outputs.Add(TOutputDataVertex<Metasound::FAudioBuffer>(p.Name(), p.MetaData()));
             }
 
             if (WithMIDIOut()) {
                 outputs.Add(TOutputDataVertex<FMIDIBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamMIDIOut)));
             }
 
-            for (auto& it : OutputFloatParams()) {
+            for (auto& it : OutportTrig()) {
                 auto& p = it.second;
-                outputs.Add(TOutputDataVertex<float>(p.Name(), p.MetaData()));
+                outputs.Add(TOutputDataVertex<Metasound::FTrigger>(p.Name(), p.MetaData()));
             }
 
-            for (auto& it : OutputIntParams()) {
-                auto& p = it.second;
-                outputs.Add(TOutputDataVertex<int32>(p.Name(), p.MetaData()));
-            }
-
-            for (auto& it : OutputBoolParams()) {
-                auto& p = it.second;
-                outputs.Add(TOutputDataVertex<bool>(p.Name(), p.MetaData()));
-            }
-
-            for (auto& p : OutputAudioParams()) {
-                outputs.Add(TOutputDataVertex<Metasound::FAudioBuffer>(p.Name(), p.MetaData()));
+            // add params in order
+            {
+                auto& lookupFloat = OutputFloatParams();
+                auto& lookupInt = OutputIntParams();
+                auto& lookupBool = OutputBoolParams();
+                auto count = ParamCount();
+                for (auto i = 0; i < count; i++) {
+                    auto it = lookupFloat.find(i);
+                    if (it != lookupFloat.end()) {
+                        auto& p = it->second;
+                        outputs.Add(TOutputDataVertex<float>(p.Name(), p.MetaData()));
+                        continue;
+                    }
+                    it = lookupInt.find(i);
+                    if (it != lookupInt.end()) {
+                        auto& p = it->second;
+                        outputs.Add(TOutputDataVertex<int32>(p.Name(), p.MetaData()));
+                        continue;
+                    }
+                    it = lookupBool.find(i);
+                    if (it != lookupBool.end()) {
+                        auto& p = it->second;
+                        outputs.Add(TOutputDataVertex<bool>(p.Name(), p.MetaData()));
+                        continue;
+                    }
+                }
             }
 
             Metasound::FVertexInterface interface(inputs, outputs);
