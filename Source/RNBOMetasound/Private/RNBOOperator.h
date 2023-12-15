@@ -156,7 +156,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
     static const size_t ParamCount()
     {
-        static const auto count = FRNBOMetasoundParam::NumericParamsFiltered(desc, [](const RNBO::Json& p) -> bool { return true; }).size();
+        static const size_t count = desc["parameters"].size();
         return count;
     }
 
@@ -341,6 +341,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                         inputs.Add(TInputDataVertex<bool>(p.Name(), p.MetaData(), p.InitialValue() != 0.0f));
                         continue;
                     }
+                    // this is okay, we might have non mapped params
                 }
             }
 
@@ -392,6 +393,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                         outputs.Add(TOutputDataVertex<bool>(p.Name(), p.MetaData()));
                         continue;
                     }
+                    // this is okay, we might have non mapped params
                 }
             }
 
