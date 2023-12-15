@@ -4,7 +4,8 @@
 
 namespace {
 UE::Tasks::FPipe AsyncTaskPipe{ TEXT("RNBODatarefLoader") };
-}
+FCriticalSection AsyncTaskPipeMutex;
+} // namespace
 
 namespace RNBOMetasound {
 
@@ -47,66 +48,70 @@ void WaveAssetDataRef::Update()
             Cleanup.Push(Task);
         }
 
-        Task = AsyncTaskPipe.Launch(
-            UE_SOURCE_LOCATION,
-            [this, WaveProxy]() {
-                double sr = WaveProxy->GetSampleRate();
-                size_t chans = WaveProxy->GetNumChannels();
-                // int32 frames = WaveProxy->GetNumFrames();
-                // double duration = WaveProxy->GetDuration();
+        {
+            // Launch probably isn't thread safe so we lock a mutex
+            FScopeLock Guard(&AsyncTaskPipeMutex);
+            Task = AsyncTaskPipe.Launch(
+                UE_SOURCE_LOCATION,
+                [this, WaveProxy]() {
+                    double sr = WaveProxy->GetSampleRate();
+                    size_t chans = WaveProxy->GetNumChannels();
+                    // int32 frames = WaveProxy->GetNumFrames();
+                    // double duration = WaveProxy->GetDuration();
 
-                FName Format = WaveProxy->GetRuntimeFormat();
-                IAudioInfoFactory* Factory = IAudioInfoFactoryRegistry::Get().Find(Format);
-                if (Factory == nullptr) {
-                    UE_LOG(LogMetaSound, Error, TEXT("IAudioInfoFactoryRegistry::Get().Find(%s) failed"), Format);
-                    return;
-                }
-
-                ICompressedAudioInfo* Decompress = Factory->Create();
-                FSoundQualityInfo quality;
-                TArray<uint8> Buf;
-                int32 ValidBytes = 0;
-                if (WaveProxy->IsStreaming()) {
-                    if (!Decompress->StreamCompressedInfo(WaveProxy, &quality)) {
-                        UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to get compressed stream info"));
+                    FName Format = WaveProxy->GetRuntimeFormat();
+                    IAudioInfoFactory* Factory = IAudioInfoFactoryRegistry::Get().Find(Format);
+                    if (Factory == nullptr) {
+                        UE_LOG(LogMetaSound, Error, TEXT("IAudioInfoFactoryRegistry::Get().Find(%s) failed"), Format);
                         return;
                     }
-                    Buf.AddZeroed(quality.SampleDataSize);
-                    Decompress->StreamCompressedData(Buf.GetData(), false, Buf.Num(), ValidBytes);
-                }
-                else {
-                    if (!Decompress->ReadCompressedInfo(WaveProxy->GetResourceData(), WaveProxy->GetResourceSize(), &quality)) {
-                        UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to get compressed info"));
-                        return;
-                    }
-                    Buf.AddZeroed(quality.SampleDataSize);
-                    if (Decompress->ReadCompressedData(Buf.GetData(), false, Buf.Num())) {
-                        ValidBytes = Buf.Num();
+
+                    ICompressedAudioInfo* Decompress = Factory->Create();
+                    FSoundQualityInfo quality;
+                    TArray<uint8> Buf;
+                    int32 ValidBytes = 0;
+                    if (WaveProxy->IsStreaming()) {
+                        if (!Decompress->StreamCompressedInfo(WaveProxy, &quality)) {
+                            UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to get compressed stream info"));
+                            return;
+                        }
+                        Buf.AddZeroed(quality.SampleDataSize);
+                        Decompress->StreamCompressedData(Buf.GetData(), false, Buf.Num(), ValidBytes);
                     }
                     else {
-                        UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to read compressed data"));
-                        return;
+                        if (!Decompress->ReadCompressedInfo(WaveProxy->GetResourceData(), WaveProxy->GetResourceSize(), &quality)) {
+                            UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to get compressed info"));
+                            return;
+                        }
+                        Buf.AddZeroed(quality.SampleDataSize);
+                        if (Decompress->ReadCompressedData(Buf.GetData(), false, Buf.Num())) {
+                            ValidBytes = Buf.Num();
+                        }
+                        else {
+                            UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to read compressed data"));
+                            return;
+                        }
                     }
-                }
 
-                TArrayView<const int16> Data(reinterpret_cast<const int16*>(Buf.GetData()), Buf.Num() / sizeof(int16));
+                    TArrayView<const int16> Data(reinterpret_cast<const int16*>(Buf.GetData()), Buf.Num() / sizeof(int16));
 
-                TSharedPtr<TArray<float>> Samples(new TArray<float>());
-                Samples->Reserve(Data.Num());
+                    TSharedPtr<TArray<float>> Samples(new TArray<float>());
+                    Samples->Reserve(Data.Num());
 
-                const float div = static_cast<float>(INT16_MAX);
-                for (auto i = 0; i < Data.Num(); i++) {
-                    Samples->Push(static_cast<float>(Data[i]) / div);
-                }
-                size_t SizeInBytes = Buf.Num();
-                char* DataPtr = reinterpret_cast<char*>(Samples->GetData());
+                    const float div = static_cast<float>(INT16_MAX);
+                    for (auto i = 0; i < Data.Num(); i++) {
+                        Samples->Push(static_cast<float>(Data[i]) / div);
+                    }
+                    size_t SizeInBytes = Buf.Num();
+                    char* DataPtr = reinterpret_cast<char*>(Samples->GetData());
 
-                RNBO::Float32AudioBuffer bufferType(chans, sr);
-                CoreObject.setExternalData(Id, DataPtr, sizeof(float) * static_cast<size_t>(Samples->Num()), bufferType, [Samples](RNBO::ExternalDataId, char*) mutable {
-                    Samples.Reset();
-                });
-            },
-            UE::Tasks::ETaskPriority::BackgroundNormal);
+                    RNBO::Float32AudioBuffer bufferType(chans, sr);
+                    CoreObject.setExternalData(Id, DataPtr, sizeof(float) * static_cast<size_t>(Samples->Num()), bufferType, [Samples](RNBO::ExternalDataId, char*) mutable {
+                        Samples.Reset();
+                    });
+                },
+                UE::Tasks::ETaskPriority::BackgroundNormal);
+        }
     }
 }
 
