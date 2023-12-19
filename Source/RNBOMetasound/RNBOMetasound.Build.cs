@@ -110,7 +110,6 @@ public class RNBOMetasound : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"SignalProcessing",
-				"WaveTable",
 				// ... add private dependencies that you statically link with here ...
 			}
 			);

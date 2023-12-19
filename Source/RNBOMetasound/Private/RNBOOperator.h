@@ -12,7 +12,6 @@
 #include "MetasoundPrimitives.h"
 #include "MetasoundParamHelper.h"
 #include "MetasoundVertex.h"
-#include "MetasoundWaveTable.h"
 #include "MetasoundLog.h"
 
 #include "Internationalization/Text.h"
