@@ -129,14 +129,11 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>
             const auto vel = static_cast<uint8_t>(std::clamp(*NoteVel, 1, 127));
             const auto offvel = static_cast<uint8_t>(std::clamp(*NoteOffVel, 0, 127));
             const auto chan = static_cast<uint8_t>(std::clamp(*NoteChan, 0, 15));
-            const int32 frames = std::max(static_cast<int32>(ceil(SampleRate.GetSeconds() * NoteDur->GetSeconds())), 1);
+            const int32 dur = std::max(static_cast<int32>(ceil(SampleRate.GetSeconds() * NoteDur->GetSeconds())), 1);
 
             for (auto i = 0; i < num; i++) {
                 auto start = (*Trigger)[i];
-                auto end = start + frames;
-
-                MIDIOut->Push(FMIDIPacket::NoteOn(start, note, vel, chan));
-                MIDIOut->Push(FMIDIPacket::NoteOff(end, note, offvel, chan));
+                MIDIOut->PushNote(start, dur, chan, note, vel, offvel);
             }
         }
     }
