@@ -19,6 +19,14 @@ Further documentation can be found in the form of our demo project. Download [th
 
 Your RNBO MetaSound node will be named by your top-level `[rnbo~]` object’s `@title` attribute or, if no such value exists, by the `Classname` you’ve defined in the export sidebar.
 
+## Audio Pin Naming
+
+By default a pin for `[in~ 1]` or `[out~ 2]` will be named "in1" or "out2" but you can override that in 2 ways.
+
+* `[in~ 1 @comment envelope]` will set the pin name to "envelope"
+* `[in~ 1 @meta displayname:'my name']` will set the pin name to "my name"
+* `[in~ 1 @meta tooltip:'this is a tooltip']` will set the pin tooltip to "this is a tooltip"
+
 ## Generating Pin Types
 
 A RNBO patcher's `parameters` and message `inports` or `outports` can all become pins on the RNBO Metasound node, along with a pin for `MIDI` input/output and for connecting to a `Transport`. Those pins can be input pins, output pins, or both. 

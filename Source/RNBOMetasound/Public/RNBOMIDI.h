@@ -23,6 +23,12 @@ class RNBOMETASOUND_API FMIDIPacket
     /** Advance internal frame counters by specific frame count. */
     void Advance(int32 InNumFrames);
 
+    bool IsNoteOff(uint8_t chan, uint8_t num) const;
+    bool IsNoteOn(uint8_t chan, uint8_t num) const;
+
+    // Make a copy with an updated frame
+    FMIDIPacket CloneTo(int32 frame) const;
+
   private:
     int32 mFrame;
     std::array<uint8_t, 3> mData;
@@ -48,6 +54,9 @@ class RNBOMETASOUND_API FMIDIBuffer
     const FMIDIPacket& operator[](int32 index) const;
 
     void Push(FMIDIPacket packet);
+
+    // Pushes a new note and manages updating any overlapping matching notes
+    void PushNote(int32 start, int32 dur, uint8_t chan, uint8_t note, uint8_t onvel, uint8_t offvel);
 
     void Reset();
 

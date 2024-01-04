@@ -81,6 +81,23 @@ void FMIDIPacket::Advance(int32 InNumFrames)
     mFrame -= InNumFrames;
 }
 
+bool FMIDIPacket::IsNoteOff(uint8_t chan, uint8_t num) const
+{
+    return mLength == 3 && mData[0] == (chan | 0x80) && mData[1] == num;
+}
+
+bool FMIDIPacket::IsNoteOn(uint8_t chan, uint8_t num) const
+{
+    return mLength == 3 && mData[0] == (chan | 0x90) && mData[1] == num;
+}
+
+FMIDIPacket FMIDIPacket::CloneTo(int32 frame) const
+{
+    FMIDIPacket r = *this;
+    r.mFrame = frame;
+    return r;
+}
+
 FMIDIBuffer::FMIDIBuffer(const Metasound::FOperatorSettings& InSettings)
     : NumFramesPerBlock(InSettings.GetNumFramesPerBlock())
 {
@@ -140,6 +157,70 @@ void FMIDIBuffer::Push(FMIDIPacket packet)
         }
         // assert false?
     }
+}
+
+void FMIDIBuffer::PushNote(int32 start, int32 dur, uint8_t chan, uint8_t note, uint8_t onvel, uint8_t offvel)
+{
+    /* situations where we have to move an OFF
+     * 1. Our new note happens inside another scheduled duration
+     *    * off after our off without an on after our off, move old off right before our new on
+     * 2. Our new note spans the off of another note
+     *    * off between our on and our off, move old off to right before our new on
+     * 3. Our new note spans the an entire note
+     *    * on and off come between our new on and off, move old off right before our new on
+     *
+     */
+    const auto count = Packets.Num();
+    const auto end = start + dur;
+    for (auto i = 0; i < count; i++) {
+        auto& p = Packets[i];
+        const auto f = p.Frame();
+        if (f < start) {
+            continue;
+        }
+        // in range
+        if (p.IsNoteOn(chan, note)) {
+            // existing note starts before our note ends, we need to shorten our note
+            if (f < end) {
+                // insert our Off before the existing On, updated time
+                Packets.Insert(FMIDIPacket::NoteOff(f, note, offvel, chan), i);
+                // adjust count
+                if (f < NumFramesPerBlock) {
+                    CountInBlock++;
+                }
+                // push our on after so we don't screw up above index
+                Push(FMIDIPacket::NoteOn(start, note, onvel, chan));
+                return;
+            }
+            else {
+                break;
+            }
+        }
+        else if (p.IsNoteOff(chan, note) && f > start) {
+            // should only hit this case if a note on isn't found either within the new note bounds or after it.
+            // our new note either spans the off of an existing on note or is contained within an existing note
+            // move the off just before our on
+            auto off = p.CloneTo(start);
+            Packets.RemoveAt(i);
+
+            // adjust count
+            if (f < NumFramesPerBlock) {
+                CountInBlock--; // will get incremented in the Push below
+            }
+            // adjust last frame
+            if (Packets.Num() > 0) {
+                LastFrame = Packets.Last(0).Frame();
+            }
+            else {
+                LastFrame = -1;
+            }
+            Push(off); // XXX assumes there isn't another matching On at the exact time
+            break;
+        }
+    }
+
+    Push(FMIDIPacket::NoteOn(start, note, onvel, chan));
+    Push(FMIDIPacket::NoteOff(end, note, offvel, chan));
 }
 
 void FMIDIBuffer::Reset()
