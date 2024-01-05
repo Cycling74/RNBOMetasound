@@ -94,6 +94,8 @@ using namespace Metasound;
 using namespace RNBOMetasound;
 
 namespace {
+METASOUND_PARAM(ParamTransport, "Transport", "The transport.")
+
 METASOUND_PARAM(ParamTransportLatch, "Latch", "Latch the input values.")
 METASOUND_PARAM(ParamTransportBPM, "BPM", "The tempo of the transport in beats per minute.")
 METASOUND_PARAM(ParamTransportRun, "Run", "The run state of the transport.")
@@ -101,6 +103,11 @@ METASOUND_PARAM(ParamTransportNum, "Numerator", "The transport time signature nu
 METASOUND_PARAM(ParamTransportDen, "Denominator", "The transport time signature denominator.")
 
 METASOUND_PARAM(ParamTransportBeatTime, "BeatTime", "The transport beat time.")
+
+METASOUND_PARAM(ParamTransportBar, "Bar", "The transport bar.")
+METASOUND_PARAM(ParamTransportBeat, "Beat", "The transport beat.")
+METASOUND_PARAM(ParamTransportTick, "Tick", "The transport tick.")
+
 METASOUND_PARAM(ParamTransportSeek, "Seek", "Read the BeatTime input and jump there.")
 
 FCriticalSection GlobalTransportMutex;
@@ -517,6 +524,120 @@ class FGlobalTransportControlOperator : public TExecutableOperator<FGlobalTransp
     FTriggerReadRef TransportSeek;
 };
 
+class FTransportGetOperator : public TExecutableOperator<FTransportGetOperator>
+{
+  public:
+    static const FNodeClassMetadata& GetNodeInfo()
+    {
+        auto InitNodeInfo = []() -> FNodeClassMetadata {
+            FNodeClassMetadata Info;
+
+            Info.ClassName = { TEXT("UE"), TEXT("TransportGet"), TEXT("Audio") };
+            Info.MajorVersion = 1;
+            Info.MinorVersion = 0;
+            Info.DisplayName = LOCTEXT("Metasound_TransportGetDisplayName", "Transport Get");
+            Info.Description = LOCTEXT("Metasound_TransportGetNodeDescription", "Transport Get Utility.");
+            Info.Author = PluginAuthor;
+            Info.PromptIfMissing = PluginNodeMissingPrompt;
+            Info.DefaultInterface = GetVertexInterface();
+            Info.CategoryHierarchy = { LOCTEXT("Metasound_TransportGetNodeCategory", "Utils") };
+
+            return Info;
+        };
+
+        static const FNodeClassMetadata Info = InitNodeInfo();
+
+        return Info;
+    }
+    static const FVertexInterface& GetVertexInterface()
+    {
+        auto InitVertexInterface = []() -> FVertexInterface {
+            FInputVertexInterface inputs;
+            inputs.Add(TInputDataVertex<FTransport>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransport)));
+
+            FOutputVertexInterface outputs;
+
+            outputs.Add(TOutputDataVertex<bool>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportRun)));
+
+            outputs.Add(TOutputDataVertex<float>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBPM)));
+
+            outputs.Add(TOutputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBar)));
+            outputs.Add(TOutputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportBeat)));
+            outputs.Add(TOutputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportTick)));
+
+            outputs.Add(TOutputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportNum)));
+            outputs.Add(TOutputDataVertex<int32>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamTransportDen)));
+
+            FVertexInterface Interface(inputs, outputs);
+
+            return Interface;
+        };
+
+        static const FVertexInterface Interface = InitVertexInterface();
+        return Interface;
+    }
+
+    static TUniquePtr<IOperator> CreateOperator(const FCreateOperatorParams& InParams, FBuildErrorArray& OutErrors)
+    {
+        const FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
+        const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
+
+        return MakeUnique<FTransportGetOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutErrors);
+    }
+
+    FTransportGetOperator(
+        const FCreateOperatorParams& InParams,
+        const FOperatorSettings& InSettings,
+        const FDataReferenceCollection& InputCollection,
+        const FInputVertexInterface& InputInterface,
+        FBuildErrorArray& OutErrors)
+        : Transport(InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)))
+        , TransportRun(FBoolWriteRef::CreateNew(false))
+        , TransportBPM(FFloatWriteRef::CreateNew(100.0))
+        , TransportBar(FInt32WriteRef::CreateNew(0))
+        , TransportBeat(FInt32WriteRef::CreateNew(0))
+        , TransportTick(FInt32WriteRef::CreateNew(0))
+        , TransportNum(FInt32WriteRef::CreateNew(4))
+        , TransportDen(FInt32WriteRef::CreateNew(4))
+    {
+    }
+
+    virtual void BindInputs(FInputVertexInterfaceData& InOutVertexData) override
+    {
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransport), Transport);
+    }
+
+    virtual void BindOutputs(FOutputVertexInterfaceData& InOutVertexData) override
+    {
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportRun), TransportRun);
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBPM), TransportBPM);
+
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBar), TransportBar);
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportBeat), TransportBeat);
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportTick), TransportTick);
+
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportNum), TransportNum);
+        InOutVertexData.BindReadVertex(METASOUND_GET_PARAM_NAME(ParamTransportDen), TransportDen);
+    }
+
+    void Execute()
+    {
+    }
+
+  private:
+    FTransportReadRef Transport;
+
+    FBoolWriteRef TransportRun;
+    FFloatWriteRef TransportBPM;
+
+    FInt32WriteRef TransportBar;
+    FInt32WriteRef TransportBeat;
+    FInt32WriteRef TransportTick;
+
+    FInt32WriteRef TransportNum;
+    FInt32WriteRef TransportDen;
+};
+
 using TransportOperatorNode = FGenericNode<FTransportOperator>;
 METASOUND_REGISTER_NODE(TransportOperatorNode)
 
@@ -525,6 +646,9 @@ METASOUND_REGISTER_NODE(GlobalTransportOperatorNode)
 
 using GlobalTransportControlOperatorNode = FGenericNode<FGlobalTransportControlOperator>;
 METASOUND_REGISTER_NODE(GlobalTransportControlOperatorNode)
+
+using TransportGetOperatorNode = FGenericNode<FTransportGetOperator>;
+METASOUND_REGISTER_NODE(TransportGetOperatorNode)
 } // namespace
 
 #undef LOCTEXT_NAMESPACE
