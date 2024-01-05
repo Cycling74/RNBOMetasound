@@ -622,6 +622,24 @@ class FTransportGetOperator : public TExecutableOperator<FTransportGetOperator>
 
     void Execute()
     {
+        *TransportRun = Transport->GetRun();
+        *TransportBPM = Transport->GetBPM();
+
+        auto beattime = Transport->GetBeatTime().GetSeconds();
+        auto [num, den] = Transport->GetTimeSig();
+
+        double intpart;
+        double fractpart = modf(beattime, &intpart);
+
+        int64 beat = static_cast<int64>(intpart);
+        int32 bar = static_cast<int32>(beat / num);
+
+        *TransportBar = bar;
+        *TransportBeat = static_cast<int32>(beat % num);
+        *TransportTick = static_cast<int32>(fractpart * 480.0); // rnbo and max use 480 for ppq
+
+        *TransportNum = num;
+        *TransportDen = den;
     }
 
   private:
