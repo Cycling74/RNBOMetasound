@@ -632,10 +632,25 @@ class FTransportGetOperator : public TExecutableOperator<FTransportGetOperator>
         double fractpart = modf(beattime, &intpart);
 
         int64 beat = static_cast<int64>(intpart);
-        int32 bar = static_cast<int32>(beat / num);
+        int32 bar = static_cast<int32>(floor(beat / num)); // always round down
 
-        *TransportBar = bar;
-        *TransportBeat = static_cast<int32>(beat % num);
+        // deal with negative
+        if (bar >= 0) {
+            beat = beat % num;
+        }
+        else {
+            // may never be hit because as of this writing, transport is clamped above 0
+            // ticks are always positive
+            if (fractpart < 0.0) {
+                fractpart = 1.0 + fractpart;
+            }
+            // beat should always be positive
+            beat = beat - bar * num;
+        }
+
+        // bar and beat are 1 based
+        *TransportBar = bar + 1;
+        *TransportBeat = static_cast<int32>(beat) + 1;
         *TransportTick = static_cast<int32>(fractpart * 480.0); // rnbo and max use 480 for ppq
 
         *TransportNum = num;
