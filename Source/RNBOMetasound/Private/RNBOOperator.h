@@ -452,7 +452,10 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             RNBO::DataRefIndex index = 0;
             for (auto& p : DataRefParams()) {
                 auto id = CoreObject.getExternalDataId(index++);
-                mDataRefParams.emplace_back(CoreObject, id, p.Name(), InSettings, InputCollection);
+                WaveAssetDataRef ref(CoreObject, id, p.Name(), InSettings, InputCollection);
+                // TODO could maybe even load the data in the main thread?
+                ref.Update();
+                mDataRefParams.push_back(std::move(ref));
             }
         }
 
