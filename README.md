@@ -23,8 +23,6 @@ At this early stage in the developement of this tool, there exist some known lim
 
 You can read more about each of the following topics in [our documentation](docs/README.md), including suggested current workarounds. 
 
-* At present, you will not be able to use or set a `DataRef` (buffer) inside of the node built from your RNBO export.
-
 * At present, `inport` and `outport` will only receive and transmit a `bang`, which is translated as a `Trigger` in MetaSounds. Float and list messages are [not currently implemented](docs/README.md#trigger).
 
 * See our [issues page](https://github.com/Cycling74/RNBOMetasound/issues) for more discussion.

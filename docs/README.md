@@ -21,7 +21,7 @@ Your RNBO MetaSound node will be named by your top-level `[rnbo~]` object’s `@
 
 ## Generating Pin Types
 
-A RNBO patcher's `parameters` and message `inports` or `outports` can all become pins on the RNBO Metasound node, along with a pin for `MIDI` input/output and for connecting to a `Transport`. Those pins can be input pins, output pins, or both. 
+A RNBO patcher's `parameters`, message `inports` or `outports`, and `buffer~` objects can all become pins on the RNBO Metasound node, along with a pin for `MIDI` input/output and for connecting to a `Transport`. These objects can generate input pins, output pins, and in some cases, both. 
 
 ### Input and Output Parameters 
 
@@ -54,6 +54,10 @@ By default a pin for `[in~ 1]` or `[out~ 2]` will be named "in1" or "out2" but y
 `[inport bar]` or `[output bar]` will create a `Trigger` input or output pin on the resulting MS node. 
 
 Note that at present, the pin will only output a `Trigger` if the `outport` is set to output a `bang`.
+
+### WaveAsset
+
+A named buffer in a RNBO patch will generate an input pin of `WaveAsset` type.
 
 ## Utility Nodes
 
