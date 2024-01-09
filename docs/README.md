@@ -53,7 +53,9 @@ Note that at present, the pin will only output a `Trigger` if the `outport` is s
 
 ### WaveAsset
 
-A named buffer in a RNBO patch will generate an input pin of `WaveAsset` type.
+A named buffer in a RNBO patch will generate an input pin of `WaveAsset` type. 
+
+Note that making `WaveAsset` data available to the RNBO node is an async operation, and that this data may not be available to the RNBO node immediately upon construction of the Metasound.
 
 ## Utility Nodes
 
