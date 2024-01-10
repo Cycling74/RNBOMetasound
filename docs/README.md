@@ -86,7 +86,3 @@ The `Make Note` node is very similar to RNBO's `[makenote]` object, but as a Met
 Your RNBO patchers (and thus nodes) can be polyphonic. In order to send multiple MIDI note-on messages into a node at the same time, for example, to play a chord, you can use the `MIDI Merge` nodes, which take several MIDI type inputs and output them along a single patch cord. 
 
 The `MIDI Merge` nodes have several versions, which you can select from depending on how many MIDI sources you'd like to merge. 
-
-## A note on buffers and audio files
-
-At present, external buffers referenced by RNBO patchers are not yet supported in the RNBO-built MetaSound node. 
