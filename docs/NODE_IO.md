@@ -39,3 +39,6 @@ At present, `@enum` parameters are transformed into `Int` type pin in the MS nod
 ### Other Pin Types
 
 For more information, see the [Buffers](BUFFERS.md), [MIDI](MIDI.md), and [Transport](TRANSPORT.md) articles.
+
+- Back to [Table Of Contents](README.md/#documentation-table-of-contents)
+- Next: [Buffers and Wave Assets](BUFFERS.md)
