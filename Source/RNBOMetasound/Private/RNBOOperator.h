@@ -17,12 +17,10 @@
 #include "Internationalization/Text.h"
 #include <unordered_map>
 
-#include "DecoderInputFactory.h"
 #include "DSP/BufferVectorOperations.h"
 #include "DSP/ConvertDeinterleave.h"
 #include "DSP/MultichannelBuffer.h"
 #include "DSP/MultichannelLinearResampler.h"
-#include "IAudioCodec.h"
 #include "MetasoundWave.h"
 #include "Sound/SampleBufferIO.h"
 #include "AudioStreaming.h"
@@ -55,7 +53,7 @@ struct WaveAssetDataRef
         const char* id,
         const TCHAR* Name,
         const Metasound::FOperatorSettings& InSettings,
-        const Metasound::FDataReferenceCollection& InputCollection);
+        const Metasound::FInputVertexInterfaceData& InputCollection);
     ~WaveAssetDataRef();
     void Update();
 };
@@ -404,20 +402,20 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         return Interface;
     }
 
-    static TUniquePtr<Metasound::IOperator> CreateOperator(const Metasound::FCreateOperatorParams& InParams, Metasound::FBuildErrorArray& OutErrors)
+    static TUniquePtr<Metasound::IOperator> CreateOperator(const Metasound::FBuildOperatorParams& InParams, Metasound::FBuildResults& OutResults)
     {
-        const Metasound::FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
+        const Metasound::FInputVertexInterfaceData& InputCollection = InParams.InputData;
         const Metasound::FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
-        return MakeUnique<FRNBOOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutErrors);
+        return MakeUnique<FRNBOOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutResults);
     }
 
     FRNBOOperator(
-        const Metasound::FCreateOperatorParams& InParams,
+        const Metasound::FBuildOperatorParams& InParams,
         const Metasound::FOperatorSettings& InSettings,
-        const Metasound::FDataReferenceCollection& InputCollection,
+        const Metasound::FInputVertexInterfaceData& InputCollection,
         const Metasound::FInputVertexInterface& InputInterface,
-        Metasound::FBuildErrorArray& OutErrors)
+        Metasound::FBuildResults& OutResults)
         : CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())()))
         , mNumFrames(InSettings.GetNumFramesPerBlock())
         , mSampleRate(InSettings.GetSampleRate())
@@ -429,23 +427,23 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
         // INPUTS
         for (auto& it : InportTrig()) {
-            mInportTriggerParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstruct<Metasound::FTrigger>(it.second.Name(), InSettings));
+            mInportTriggerParams.emplace(it.first, InputCollection.GetOrConstructDataReadReference<Metasound::FTrigger>(it.second.Name(), InSettings));
         }
 
         if (WithMIDIIn()) {
-            MIDIIn = { InputCollection.GetDataReadReferenceOrConstruct<FMIDIBuffer>(METASOUND_GET_PARAM_NAME(ParamMIDIIn), InSettings) };
+            MIDIIn = { InputCollection.GetOrConstructDataReadReference<FMIDIBuffer>(METASOUND_GET_PARAM_NAME(ParamMIDIIn), InSettings) };
         }
 
         for (auto& it : InputFloatParams()) {
-            mInputFloatParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, it.second.Name(), InSettings));
+            mInputFloatParams.emplace(it.first, InputCollection.GetOrCreateDefaultDataReadReference<float>(it.second.Name(), InSettings));
         }
 
         for (auto& it : InputIntParams()) {
-            mInputIntParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, it.second.Name(), InSettings));
+            mInputIntParams.emplace(it.first, InputCollection.GetOrCreateDefaultDataReadReference<int32>(it.second.Name(), InSettings));
         }
 
         for (auto& it : InputBoolParams()) {
-            mInputBoolParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, it.second.Name(), InSettings));
+            mInputBoolParams.emplace(it.first, InputCollection.GetOrCreateDefaultDataReadReference<bool>(it.second.Name(), InSettings));
         }
 
         {
@@ -460,7 +458,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         }
 
         for (auto& p : InputAudioParams()) {
-            mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FAudioBuffer>(p.Name(), InSettings));
+            mInputAudioParams.emplace_back(InputCollection.GetOrConstructDataReadReference<Metasound::FAudioBuffer>(p.Name(), InSettings));
             mInputAudioBuffers.emplace_back(nullptr);
         }
 
@@ -492,7 +490,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         }
 
         if (WithTransport()) {
-            Transport = { InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)) };
+            Transport = { InputCollection.GetOrConstructDataReadReference<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)) };
         }
     }
 
