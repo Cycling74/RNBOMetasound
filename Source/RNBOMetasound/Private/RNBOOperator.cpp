@@ -1,5 +1,3 @@
-#pragma once
-
 #include "RNBOOperator.h"
 
 namespace {
@@ -14,10 +12,10 @@ WaveAssetDataRef::WaveAssetDataRef(
     const char* id,
     const TCHAR* Name,
     const Metasound::FOperatorSettings& InSettings,
-    const Metasound::FDataReferenceCollection& InputCollection)
+    const Metasound::FInputVertexInterfaceData& InputCollection)
     : CoreObject(coreObject)
     , Id(id)
-    , WaveAsset(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FWaveAsset>(Name))
+    , WaveAsset(InputCollection.GetOrConstructDataReadReference<Metasound::FWaveAsset>(Name))
 {
 }
 
@@ -62,7 +60,7 @@ void WaveAssetDataRef::Update()
                     FName Format = WaveProxy->GetRuntimeFormat();
                     IAudioInfoFactory* Factory = IAudioInfoFactoryRegistry::Get().Find(Format);
                     if (Factory == nullptr) {
-                        UE_LOG(LogMetaSound, Error, TEXT("IAudioInfoFactoryRegistry::Get().Find(%s) failed"), Format);
+                        UE_LOG(LogMetaSound, Error, TEXT("IAudioInfoFactoryRegistry::Get().Find(%s) failed"), *Format.ToString());
                         return;
                     }
 

@@ -2,6 +2,7 @@
 #include "RNBONode.h"
 #include <vector>
 #include <array>
+#include <string>
 
 #include "MetasoundParamHelper.h"
 #include "MetasoundDataReferenceMacro.h"
@@ -106,24 +107,24 @@ class FMIDIMergeOperator : public TExecutableOperator<FMIDIMergeOperator<N>>
         return Interface;
     }
 
-    static TUniquePtr<IOperator> CreateOperator(const FCreateOperatorParams& InParams, FBuildErrorArray& OutErrors)
+    static TUniquePtr<IOperator> CreateOperator(const Metasound::FBuildOperatorParams& InParams, Metasound::FBuildResults& OutResults)
     {
-        const FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
+        const FInputVertexInterfaceData& InputCollection = InParams.InputData;
         const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
-        return MakeUnique<FMIDIMergeOperator<N>>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutErrors);
+        return MakeUnique<FMIDIMergeOperator<N>>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutResults);
     }
 
     FMIDIMergeOperator(
-        const FCreateOperatorParams& InParams,
+        const FBuildOperatorParams& InParams,
         const FOperatorSettings& InSettings,
-        const FDataReferenceCollection& InputCollection,
+        const FInputVertexInterfaceData& InputCollection,
         const FInputVertexInterface& InputInterface,
-        FBuildErrorArray& OutErrors)
+        FBuildResults& OutResults)
         : MIDIOut(FMIDIBufferWriteRef::CreateNew(InSettings))
     {
         for (size_t i = 0; i < N; i++) {
-            MIDIIn.push_back(InputCollection.GetDataReadReferenceOrConstruct<FMIDIBuffer>(InputNames[i], InSettings));
+            MIDIIn.push_back(InputCollection.GetOrCreateDefaultDataReadReference<FMIDIBuffer>(InputNames[i], InSettings));
         }
     }
 
