@@ -74,30 +74,30 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>
         return Interface;
     }
 
-    static TUniquePtr<IOperator> CreateOperator(const FCreateOperatorParams& InParams, FBuildErrorArray& OutErrors)
+    static TUniquePtr<IOperator> CreateOperator(const Metasound::FBuildOperatorParams& InParams, Metasound::FBuildResults& OutResults)
     {
-        const FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
+        const FInputVertexInterfaceData& InputCollection = InParams.InputData;
         const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
-        return MakeUnique<FMakeNoteOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutErrors);
+        return MakeUnique<FMakeNoteOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutResults);
     }
 
     FMakeNoteOperator(
-        const FCreateOperatorParams& InParams,
+        const FBuildOperatorParams& InParams,
         const FOperatorSettings& InSettings,
-        const FDataReferenceCollection& InputCollection,
+        const FInputVertexInterfaceData& InputCollection,
         const FInputVertexInterface& InputInterface,
-        FBuildErrorArray& OutErrors)
+        FBuildResults& OutResults)
         : SampleRate(InSettings.GetSampleRate())
 
-        , Trigger(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FTrigger>(METASOUND_GET_PARAM_NAME(ParamMakeNoteTrig), InSettings))
+        , Trigger(InputCollection.GetOrConstructDataReadReference<Metasound::FTrigger>(METASOUND_GET_PARAM_NAME(ParamMakeNoteTrig), InSettings))
 
-        , NoteNum(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamMakeNoteNote), InSettings))
-        , NoteVel(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamMakeNoteVel), InSettings))
-        , NoteOffVel(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamMakeNoteOffVel), InSettings))
-        , NoteChan(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, METASOUND_GET_PARAM_NAME(ParamMakeNoteChan), InSettings))
+        , NoteNum(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamMakeNoteNote), InSettings))
+        , NoteVel(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamMakeNoteVel), InSettings))
+        , NoteOffVel(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamMakeNoteOffVel), InSettings))
+        , NoteChan(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamMakeNoteChan), InSettings))
 
-        , NoteDur(InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<FTime>(InputInterface, METASOUND_GET_PARAM_NAME(ParamMakeNoteDur), InSettings))
+        , NoteDur(InputCollection.GetOrCreateDefaultDataReadReference<FTime>(METASOUND_GET_PARAM_NAME(ParamMakeNoteDur), InSettings))
 
         , MIDIOut(FMIDIBufferWriteRef::CreateNew(InSettings))
     {
