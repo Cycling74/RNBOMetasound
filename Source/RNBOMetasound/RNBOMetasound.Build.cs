@@ -99,6 +99,9 @@ public class RNBOMetasound : ModuleRules
 				"MetasoundGraphCore",
 				"MetasoundStandardNodes",
 				"MetasoundEngine",
+				"Harmonix",
+				"HarmonixMetasound",
+				"HarmonixMidi",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
