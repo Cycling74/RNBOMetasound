@@ -26,6 +26,7 @@
 #include "HarmonixMetasound/DataTypes/MidiStream.h"
 #include "HarmonixMidi/MidiMsg.h"
 #include "HarmonixMidi/MidiConstants.h"
+#include "HarmonixMidi/MidiVoiceId.h"
 
 #include "AudioDecompress.h"
 #include "Interfaces/IAudioFormat.h"
@@ -117,6 +118,7 @@ class FRNBOMetasoundParam
 template <const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr (*FactoryFunction)(RNBO::PlatformInterface* platformInterface)>
 class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>
     , public RNBO::EventHandler
+    , public FMidiVoiceGeneratorBase
 {
   private:
     RNBO::CoreObject CoreObject;
@@ -418,7 +420,8 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         const Metasound::FInputVertexInterfaceData& InputCollection,
         const Metasound::FInputVertexInterface& InputInterface,
         Metasound::FBuildResults& OutResults)
-        : CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())()))
+        : FMidiVoiceGeneratorBase()
+        , CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())()))
         , mNumFrames(InSettings.GetNumFramesPerBlock())
         , mSampleRate(InSettings.GetSampleRate())
 
@@ -846,9 +849,9 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
                 break;
         };
 
-        uint32 id = 0; //XXX do we need some other ID?
-        HarmonixMetasound::FMidiStreamEvent packet(id, FMidiMsg(status, data1, data2));
+        HarmonixMetasound::FMidiStreamEvent packet(this, FMidiMsg(status, data1, data2));
         packet.BlockSampleFrameIndex = frame;
+        packet.TrackIndex = 1; // as per rec from Harmonix
         MIDIOut.GetValue()->AddMidiEvent(packet);
     }
 };

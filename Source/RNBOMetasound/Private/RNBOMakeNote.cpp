@@ -5,6 +5,7 @@
 #include "MetasoundTime.h"
 #include "MetasoundVertex.h"
 #include "HarmonixMetasound/DataTypes/MidiStream.h"
+#include "HarmonixMidi/MidiVoiceId.h"
 
 namespace {
 
@@ -24,7 +25,7 @@ METASOUND_PARAM(ParamMakeNoteDur, "Duration", "The note duration (seconds).")
 METASOUND_PARAM(ParamMakeNoteMIDI, "MIDI", "The resultant MIDI.")
 } // namespace
 
-class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>
+class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>, public FMidiVoiceGeneratorBase
 {
   public:
     static const FNodeClassMetadata& GetNodeInfo()
@@ -88,8 +89,9 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>
         const FInputVertexInterfaceData& InputCollection,
         const FInputVertexInterface& InputInterface,
         FBuildResults& OutResults)
-        : SampleRate(InSettings.GetSampleRate())
+        : FMidiVoiceGeneratorBase()
 
+        , SampleRate(InSettings.GetSampleRate())
         , Trigger(InputCollection.GetOrConstructDataReadReference<Metasound::FTrigger>(METASOUND_GET_PARAM_NAME(ParamMakeNoteTrig), InSettings))
 
         , NoteNum(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamMakeNoteNote), InSettings))
@@ -134,8 +136,13 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>
 
             for (auto i = 0; i < num; i++) {
                 auto start = (*Trigger)[i];
-                HarmonixMetasound::FMidiStreamEvent noteon(id, FMidiMsg::CreateNoteOn(chan, note, vel));
-                HarmonixMetasound::FMidiStreamEvent noteoff(id, FMidiMsg(chan | 0x80, note, offvel));
+                HarmonixMetasound::FMidiStreamEvent noteon(this, FMidiMsg::CreateNoteOn(chan, note, vel));
+                HarmonixMetasound::FMidiStreamEvent noteoff(this, FMidiMsg(chan | 0x80, note, offvel));
+
+                // as per rec from Harmonix, could eventually make this user configurable with an input
+                noteon.TrackIndex = 1;
+                noteoff.TrackIndex = 1;
+
                 noteoff.BlockSampleFrameIndex = dur;
                 MIDIOut->AddMidiEvent(noteon);
                 MIDIOut->AddMidiEvent(noteoff);
