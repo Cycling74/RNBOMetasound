@@ -2,52 +2,29 @@
 
 As this integration is in an experimental state, so is this documentation, and this guide should not be considered an encyclopedic reference, but rather a quick-start with a handful of ways to use this tool.
 
+## Example project 
+
+Further documentation can be found in the form of our demo project. Download [the project here](https://cycling74-assets.nyc3.digitaloceanspaces.com/rnbo/unreal-engine/example-projects/rnbo.metasounds.testproj-10.13.23.zip) and open up its `README.md` to get started.
+
 ## Geting Started
 
-*This section is a stub --*
+1. You will need to create an `Exports/` directory to hold your RNBO exports. 
+2. Place `Exports/` inside this repository root directory, with a path like: `/<Your UE Project>/Plugins/RNBOMetasound/Exports/`
+3. Give each RNBO patch a unique `Export Name` and `Classname`
+4. Create a folder inside `Exports/` for each exported RNBO patch, like `Exports/<Your RNBO Device Name>/`
+5. Export your c++ source code export to the folder you create in step 4. 
+6. After you export, you must build your project. Your UE project should be a C++ project so that you can generate a Visual Studio solution or Xcode project for your game.
 
-* When exporting your RNBO C++ source, you can pick an export directory that should have a path like: `/<Your UE Project>/Plugins/RNBOMetasound/Exports/<Your RNBO Device Name>/`
+### Naming your RNBO Node
 
-* After you export, you must build your project.
+Your RNBO MetaSound node will be named by your top-level `[rnbo~]` object’s `@title` attribute or, if no such value exists, by the `Classname` you’ve defined in the export sidebar.
 
-## Input and Output Parameters 
+## Documentation Table of Contents
 
-You can set whether a parameter of your RNBO patcher will become an input or an output pin using parameter metadata. 
+Your MetaSound node will have input and output pins built from your RNBO patch's parameters, inport/outports, buffers, MIDI and Transport objects. In addition to your custom node, this plugin will also build several utility nodes that helps you access some of RNBO's features in the MetaSound graph editor. 
 
-* `[param foo]` will create an input pin
-* `[param foo @meta in:true]` will only create an input pin
-* `[param foo @meta out:true]` will create both an input and an output pin
-* `[param foo @meta in:false,out:true]` will only create an output pin
-
-## Audio Pin Naming
-
-By default a pin for `[in~ 1]` or `[out~ 2]` will be named "in1" or "out2" but you can override that in 2 ways.
-
-* `[in~ 1 @comment envelope]` will set the pin name to "envelope"
-* `[in~ 1 @meta displayname:'my name']` will set the pin name to "my name"
-* `[in~ 1 @meta tooltip:'this is a tooltip']` will set the pin tooltip to "this is a tooltip"
-
-## Generating Pin Types
-
-*This section is a stub --*
-
-### Boolean
-
-`[param foo @enum 0 1]` will be treated as a boolean type in the MS graph.
-
-![boolean in Max](img/boolean-in-Max.png)
-![boolean in UE](img/boolean-in-UE.png)
-
-### Trigger
-`[inport bar]` or `[output bar]` will create a `Trigger` input or output pin on the resulting MS node. 
-
-Note that at present, the pin will only output a `Trigger` if the `outport` is set to output a `bang`.
-
-## A note on buffers and audio files
-
-## Transport
-
-## MIDI
-
-
+- [Node Pins and I/O: types and naming](NODE_IO.md)
+- [Buffers and Wave Assets](BUFFERS.md)
+- [MIDI](MIDI.md)
+- [Transport - Global and Local](TRANSPORT.md)
 
