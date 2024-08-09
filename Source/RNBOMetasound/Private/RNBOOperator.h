@@ -1,7 +1,6 @@
 #pragma once
 
 #include "RNBONode.h"
-#include "RNBOMIDI.h"
 #include "RNBOTransport.h"
 
 // visual studio warnings we're having trouble with
@@ -17,15 +16,17 @@
 #include "Internationalization/Text.h"
 #include <unordered_map>
 
-#include "DecoderInputFactory.h"
 #include "DSP/BufferVectorOperations.h"
 #include "DSP/ConvertDeinterleave.h"
 #include "DSP/MultichannelBuffer.h"
 #include "DSP/MultichannelLinearResampler.h"
-#include "IAudioCodec.h"
 #include "MetasoundWave.h"
 #include "Sound/SampleBufferIO.h"
 #include "AudioStreaming.h"
+#include "HarmonixMetasound/DataTypes/MidiStream.h"
+#include "HarmonixMidi/MidiMsg.h"
+#include "HarmonixMidi/MidiConstants.h"
+#include "HarmonixMidi/MidiVoiceId.h"
 
 #include "AudioDecompress.h"
 #include "Interfaces/IAudioFormat.h"
@@ -55,7 +56,7 @@ struct WaveAssetDataRef
         const char* id,
         const TCHAR* Name,
         const Metasound::FOperatorSettings& InSettings,
-        const Metasound::FDataReferenceCollection& InputCollection);
+        const Metasound::FInputVertexInterfaceData& InputCollection);
     ~WaveAssetDataRef();
     void Update();
 };
@@ -117,6 +118,7 @@ class FRNBOMetasoundParam
 template <const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr (*FactoryFunction)(RNBO::PlatformInterface* platformInterface)>
 class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>
     , public RNBO::EventHandler
+    , public FMidiVoiceGeneratorBase
 {
   private:
     RNBO::CoreObject CoreObject;
@@ -144,8 +146,8 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
     TOptional<FTransportReadRef> Transport;
 
-    TOptional<FMIDIBufferReadRef> MIDIIn;
-    TOptional<FMIDIBufferWriteRef> MIDIOut;
+    TOptional<HarmonixMetasound::FMidiStreamReadRef> MIDIIn;
+    TOptional<HarmonixMetasound::FMidiStreamWriteRef> MIDIOut;
 
     double LastTransportBeatTime = -1.0;
     float LastTransportBPM = 0.0f;
@@ -307,7 +309,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             }
 
             if (WithMIDIIn()) {
-                inputs.Add(TInputDataVertex<FMIDIBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamMIDIIn)));
+                inputs.Add(TInputDataVertex<HarmonixMetasound::FMidiStream>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamMIDIIn)));
             }
 
             for (auto& it : InportTrig()) {
@@ -359,7 +361,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             }
 
             if (WithMIDIOut()) {
-                outputs.Add(TOutputDataVertex<FMIDIBuffer>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamMIDIOut)));
+                outputs.Add(TOutputDataVertex<HarmonixMetasound::FMidiStream>(METASOUND_GET_PARAM_NAME_AND_METADATA(ParamMIDIOut)));
             }
 
             for (auto& it : OutportTrig()) {
@@ -404,21 +406,22 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         return Interface;
     }
 
-    static TUniquePtr<Metasound::IOperator> CreateOperator(const Metasound::FCreateOperatorParams& InParams, Metasound::FBuildErrorArray& OutErrors)
+    static TUniquePtr<Metasound::IOperator> CreateOperator(const Metasound::FBuildOperatorParams& InParams, Metasound::FBuildResults& OutResults)
     {
-        const Metasound::FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
+        const Metasound::FInputVertexInterfaceData& InputCollection = InParams.InputData;
         const Metasound::FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
-        return MakeUnique<FRNBOOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutErrors);
+        return MakeUnique<FRNBOOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutResults);
     }
 
     FRNBOOperator(
-        const Metasound::FCreateOperatorParams& InParams,
+        const Metasound::FBuildOperatorParams& InParams,
         const Metasound::FOperatorSettings& InSettings,
-        const Metasound::FDataReferenceCollection& InputCollection,
+        const Metasound::FInputVertexInterfaceData& InputCollection,
         const Metasound::FInputVertexInterface& InputInterface,
-        Metasound::FBuildErrorArray& OutErrors)
-        : CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())()))
+        Metasound::FBuildResults& OutResults)
+        : FMidiVoiceGeneratorBase()
+        , CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())()))
         , mNumFrames(InSettings.GetNumFramesPerBlock())
         , mSampleRate(InSettings.GetSampleRate())
 
@@ -429,35 +432,38 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
         // INPUTS
         for (auto& it : InportTrig()) {
-            mInportTriggerParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstruct<Metasound::FTrigger>(it.second.Name(), InSettings));
+            mInportTriggerParams.emplace(it.first, InputCollection.GetOrConstructDataReadReference<Metasound::FTrigger>(it.second.Name(), InSettings));
         }
 
         if (WithMIDIIn()) {
-            MIDIIn = { InputCollection.GetDataReadReferenceOrConstruct<FMIDIBuffer>(METASOUND_GET_PARAM_NAME(ParamMIDIIn), InSettings) };
+            MIDIIn = { InputCollection.GetOrConstructDataReadReference<HarmonixMetasound::FMidiStream>(METASOUND_GET_PARAM_NAME(ParamMIDIIn)) };
         }
 
         for (auto& it : InputFloatParams()) {
-            mInputFloatParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<float>(InputInterface, it.second.Name(), InSettings));
+            mInputFloatParams.emplace(it.first, InputCollection.GetOrCreateDefaultDataReadReference<float>(it.second.Name(), InSettings));
         }
 
         for (auto& it : InputIntParams()) {
-            mInputIntParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<int32>(InputInterface, it.second.Name(), InSettings));
+            mInputIntParams.emplace(it.first, InputCollection.GetOrCreateDefaultDataReadReference<int32>(it.second.Name(), InSettings));
         }
 
         for (auto& it : InputBoolParams()) {
-            mInputBoolParams.emplace(it.first, InputCollection.GetDataReadReferenceOrConstructWithVertexDefault<bool>(InputInterface, it.second.Name(), InSettings));
+            mInputBoolParams.emplace(it.first, InputCollection.GetOrCreateDefaultDataReadReference<bool>(it.second.Name(), InSettings));
         }
 
         {
             RNBO::DataRefIndex index = 0;
             for (auto& p : DataRefParams()) {
                 auto id = CoreObject.getExternalDataId(index++);
-                mDataRefParams.emplace_back(CoreObject, id, p.Name(), InSettings, InputCollection);
+                WaveAssetDataRef ref(CoreObject, id, p.Name(), InSettings, InputCollection);
+                // TODO could maybe even load the data in the main thread?
+                ref.Update();
+                mDataRefParams.push_back(std::move(ref));
             }
         }
 
         for (auto& p : InputAudioParams()) {
-            mInputAudioParams.emplace_back(InputCollection.GetDataReadReferenceOrConstruct<Metasound::FAudioBuffer>(p.Name(), InSettings));
+            mInputAudioParams.emplace_back(InputCollection.GetOrConstructDataReadReference<Metasound::FAudioBuffer>(p.Name(), InSettings));
             mInputAudioBuffers.emplace_back(nullptr);
         }
 
@@ -468,7 +474,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         }
 
         if (WithMIDIOut()) {
-            MIDIOut = FMIDIBufferWriteRef::CreateNew(InSettings);
+            MIDIOut = HarmonixMetasound::FMidiStreamWriteRef::CreateNew();
         }
 
         for (auto& it : OutputFloatParams()) {
@@ -489,7 +495,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         }
 
         if (WithTransport()) {
-            Transport = { InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)) };
+            Transport = { InputCollection.GetOrConstructDataReadReference<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)) };
         }
     }
 
@@ -621,7 +627,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         Converter = { CoreObject.getSampleRate(), CoreObject.getCurrentTime() };
 
         if (MIDIOut.IsSet()) {
-            MIDIOut.GetValue()->AdvanceBlock();
+            MIDIOut.GetValue()->PrepareBlock();
         }
 
         // update outport triggers
@@ -640,13 +646,52 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
         if (MIDIIn.IsSet()) {
             auto& midiin = MIDIIn.GetValue();
-            const int32 num = midiin->NumInBlock();
-            for (int32 i = 0; i < num; i++) {
-                const auto& e = (*midiin)[i];
-                auto ms = Converter.convertSampleOffsetToMilliseconds(static_cast<RNBO::SampleOffset>(e.Frame()));
+            for (const HarmonixMetasound::FMidiStreamEvent& Event : midiin->GetEventsInBlock()) {
+                auto& msg = Event.MidiMessage;
+                if (msg.IsStd()) {
+                    auto ms = Converter.convertSampleOffsetToMilliseconds(static_cast<RNBO::SampleOffset>(Event.BlockSampleFrameIndex));
+                    auto status = msg.GetStdStatus();
+                    std::array<uint8_t, 3> data = { status, msg.GetStdData1(), msg.GetStdData2() };
+                    size_t len = data.size();
 
-                RNBO::MidiEvent event(ms, 0, e.Data().data(), e.Length());
-                ParamInterface->scheduleEvent(event);
+                    switch (msg.GetStdStatusType()) {
+                      case Harmonix::Midi::Constants::GNoteOff:
+                      case Harmonix::Midi::Constants::GNoteOn:
+                      case Harmonix::Midi::Constants::GPolyPres:
+                      case Harmonix::Midi::Constants::GControl:
+                      case Harmonix::Midi::Constants::GPitch: //bend
+                        len = 3;
+                        break;
+                      case Harmonix::Midi::Constants::GProgram:
+                      case Harmonix::Midi::Constants::GChanPres:
+                        len = 2;
+                        break;
+                      case Harmonix::Midi::Constants::GSystem:
+                        switch (status) {
+                          case 0xF2:
+                            len = 3; //song position
+                            break;
+                          case 0xF1: //quarter frame
+                          case 0xF3: //song select
+                            len = 2;
+                            break;
+                          case 0xF0:
+                          case 0xF7:
+                            //TODO how to handle sysex? does HarmonixMidi support it?
+                            continue;
+                          default:
+                            len = 1;
+                            break;
+                        }
+                        break;
+                      default:
+                        //unknown
+                        continue;
+                    }
+
+                    RNBO::MidiEvent event(ms, 0, data.data(), len);
+                    ParamInterface->scheduleEvent(event);
+                }
             }
         }
 
@@ -728,7 +773,9 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             it.second->Reset();
         }
         if (MIDIOut.IsSet()) {
-            MIDIOut.GetValue()->Reset();
+            auto m = MIDIOut.GetValue();
+            m->PrepareBlock();
+            m->ResetClock();
         }
     }
 
@@ -785,8 +832,27 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
             return;
         }
         RNBO::SampleOffset frame = Converter.convertMillisecondsToSampleOffset(event.getTime());
-        FMIDIPacket packet(frame, event.getLength(), event.getData());
-        MIDIOut.GetValue()->Push(packet);
+
+        auto data = event.getData();
+        uint8 status = 0, data1 = 0, data2 = 0;
+        switch (event.getLength()) {
+            case 3:
+                data2 = data[2];
+                //fall thru
+            case 2:
+                data1 = data[1];
+                //fall thru
+            case 1:
+                status = data[0];
+                break;
+            default:
+                break;
+        };
+
+        HarmonixMetasound::FMidiStreamEvent packet(this, FMidiMsg(status, data1, data2));
+        packet.BlockSampleFrameIndex = frame;
+        packet.TrackIndex = 1; // as per rec from Harmonix
+        MIDIOut.GetValue()->AddMidiEvent(packet);
     }
 };
 } // namespace RNBOMetasound
