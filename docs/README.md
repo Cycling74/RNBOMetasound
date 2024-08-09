@@ -19,6 +19,13 @@ Further documentation can be found in the form of our demo project. Download [th
 
 Your RNBO MetaSound node will be named by your top-level `[rnbo~]` object’s `@title` attribute or, if no such value exists, by the `Classname` you’ve defined in the export sidebar.
 
+### Multiple Exported Patchers
+You will probably have multiple RNBO exports. Your `RNBOMetasound/` directory might end up looking something like:
+
+![multiple-exports](img/RNBOMetasoundDir.png)
+
+In this example, `BufferPlayer`, `FeedbackSynth`, `MIDIGen`, and `TransportSlicer` are all individual RNBO exports.
+
 ## Documentation Table of Contents
 
 Your MetaSound node will have input and output pins built from your RNBO patch's parameters, inport/outports, buffers, MIDI and Transport objects. In addition to your custom node, this plugin will also build several utility nodes that helps you access some of RNBO's features in the MetaSound graph editor. 
