@@ -4,7 +4,7 @@ As this integration is in an experimental state, so is this documentation, and t
 
 ## Example project 
 
-Further documentation can be found in the form of our demo project. Download [the project here](https://cycling74-assets.nyc3.digitaloceanspaces.com/rnbo/unreal-engine/example-projects/rnbo.metasounds.testproj-10.13.23.zip) and open up its `README.md` to get started.
+Further documentation can be found in the form of our demo project. Download [the project here](https://cycling74-assets.nyc3.digitaloceanspaces.com/rnbo/unreal-engine/example-projects/rnbo.metasounds.testproj-08.13.24.zip) and open up its `README.md` to get started.
 
 ## Geting Started
 
