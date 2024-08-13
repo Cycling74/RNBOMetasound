@@ -16,6 +16,11 @@ Once you've set these input parameters, you can apply, or `Latch` those values t
 
 Additionally, you can set a `BeatTime`, defined in quarter notes since the start of the transport (beat "one"), and then `Seek` to that location by sending a trigger to the `Seek` input pin.
 
+## Transport Get
+
+You can get the `bool` running state, `float` beats per minute, and `int` current beat, bar, and tick, and time signature of a Transport using the `Transport Get` node. 
+
+![transport-get](img/transport-get.png)
 
 - Back to [MIDI](MIDI.md)
 - Return to [Table Of Contents](README.md/#documentation-table-of-contents)
