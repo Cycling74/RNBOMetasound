@@ -4,7 +4,7 @@ As this integration is in an experimental state, so is this documentation, and t
 
 ## Example project 
 
-Further documentation can be found in the form of our demo project. Download [the project here](https://cycling74-assets.nyc3.digitaloceanspaces.com/rnbo/unreal-engine/example-projects/rnbo.metasounds.testproj-10.13.23.zip) and open up its `README.md` to get started.
+Further documentation can be found in the form of our demo project. Download [the project here](https://assets.cycling74.com/rnbo/unreal-engine/example-projects/rnbo.metasounds.testproj-08.13.24.zip) and open up its `README.md` to get started.
 
 ## Geting Started
 
@@ -18,6 +18,13 @@ Further documentation can be found in the form of our demo project. Download [th
 ### Naming your RNBO Node
 
 Your RNBO MetaSound node will be named by your top-level `[rnbo~]` object’s `@title` attribute or, if no such value exists, by the `Classname` you’ve defined in the export sidebar.
+
+### Multiple Exported Patchers
+You will probably have multiple RNBO exports. Your `RNBOMetasound/` directory might end up looking something like:
+
+![multiple-exports](img/RNBOMetasoundDir.png)
+
+In this example, `BufferPlayer`, `FeedbackSynth`, `MIDIGen`, and `TransportSlicer` are all individual RNBO exports.
 
 ## Documentation Table of Contents
 

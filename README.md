@@ -9,7 +9,7 @@ In addition to nodes which will hold your RNBO exports, this repository will als
 
 ### Example Project
 
-To check out an example of an Unreal Engine project full of RNBO exports, download [this project](https://cycling74-assets.nyc3.digitaloceanspaces.com/rnbo/unreal-engine/example-projects/rnbo.metasounds.testproj-10.13.23.zip) and open up its `README.md`.
+To check out an example of an Unreal Engine project full of RNBO exports, download [this project](https://assets.cycling74.com/rnbo/unreal-engine/example-projects/rnbo.metasounds.testproj-08.13.24.zip) and open up its `README.md`.
 
 ### Where to Put this Repository
 
