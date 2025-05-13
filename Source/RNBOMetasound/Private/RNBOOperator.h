@@ -115,7 +115,7 @@ class FRNBOMetasoundParam
 #define LOCTEXT_NAMESPACE "FRNBOOperator"
 
 // https://en.cppreference.com/w/cpp/language/template_parameters
-template <const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr (*FactoryFunction)(RNBO::PlatformInterface* platformInterface)>
+template <const RNBO::Json& desc, RNBO::PatcherFactoryFunctionPtr (*FactoryFunction)()>
 class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, FactoryFunction>>
     , public RNBO::EventHandler
     , public FMidiVoiceGeneratorBase
@@ -421,7 +421,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         const Metasound::FInputVertexInterface& InputInterface,
         Metasound::FBuildResults& OutResults)
         : FMidiVoiceGeneratorBase()
-        , CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction(RNBO::Platform::get())()))
+        , CoreObject(RNBO::UniquePtr<RNBO::PatcherInterface>(FactoryFunction()()))
         , mNumFrames(InSettings.GetNumFramesPerBlock())
         , mSampleRate(InSettings.GetSampleRate())
 
