@@ -181,26 +181,26 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
 
     static TUniquePtr<IOperator> CreateOperator(const Metasound::FBuildOperatorParams& InParams, Metasound::FBuildResults& OutResults)
     {
-        const FInputVertexInterfaceData& InputCollection = InParams.InputData;
+        const FInputVertexInterfaceData& InputData = InParams.InputData;
         const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
-        return MakeUnique<FTransportOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutResults);
+        return MakeUnique<FTransportOperator>(InParams, InParams.OperatorSettings, InputData, InputInterface, OutResults);
     }
 
     FTransportOperator(
         const FBuildOperatorParams& InParams,
         const FOperatorSettings& InSettings,
-        const FInputVertexInterfaceData& InputCollection,
+        const FInputVertexInterfaceData& InputData,
         const FInputVertexInterface& InputInterface,
         FBuildResults& OutResults)
         : PeriodMul(8.0 / 480.0 * static_cast<double>(InSettings.GetNumFramesPerBlock()) / static_cast<double>(InSettings.GetSampleRate()))
         , CurTransportBeatTime(0.0)
-        , TransportBPM(InputCollection.GetOrCreateDefaultDataReadReference<float>(METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
-        , TransportRun(InputCollection.GetOrCreateDefaultDataReadReference<bool>(METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
-        , TransportNum(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
-        , TransportDen(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
-        , TransportBeatTime(InputCollection.GetOrCreateDefaultDataReadReference<FTime>(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), InSettings))
-        , TransportSeek(InputCollection.GetOrConstructDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
+        , TransportBPM(InputData.GetOrCreateDefaultDataReadReference<float>(METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
+        , TransportRun(InputData.GetOrCreateDefaultDataReadReference<bool>(METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
+        , TransportNum(InputData.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
+        , TransportDen(InputData.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
+        , TransportBeatTime(InputData.GetOrCreateDefaultDataReadReference<FTime>(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), InSettings))
+        , TransportSeek(InputData.GetOrConstructDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
         , Transport(FTransportWriteRef::CreateNew(false))
     {
     }
@@ -295,16 +295,16 @@ class FGlobalTransportOperator : public TExecutableOperator<FGlobalTransportOper
 
     static TUniquePtr<IOperator> CreateOperator(const Metasound::FBuildOperatorParams& InParams, Metasound::FBuildResults& OutResults)
     {
-        const FInputVertexInterfaceData& InputCollection = InParams.InputData;
+        const FInputVertexInterfaceData& InputData = InParams.InputData;
         const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
-        return MakeUnique<FGlobalTransportOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutResults);
+        return MakeUnique<FGlobalTransportOperator>(InParams, InParams.OperatorSettings, InputData, InputInterface, OutResults);
     }
 
     FGlobalTransportOperator(
         const FBuildOperatorParams& InParams,
         const FOperatorSettings& InSettings,
-        const FInputVertexInterfaceData& InputCollection,
+        const FInputVertexInterfaceData& InputData,
         const FInputVertexInterface& InputInterface,
         FBuildResults& OutResults)
         : Transport(FTransportWriteRef::CreateNew(false))
@@ -456,25 +456,25 @@ class FGlobalTransportControlOperator : public TExecutableOperator<FGlobalTransp
 
     static TUniquePtr<IOperator> CreateOperator(const Metasound::FBuildOperatorParams& InParams, Metasound::FBuildResults& OutResults)
     {
-        const FInputVertexInterfaceData& InputCollection = InParams.InputData;
+        const FInputVertexInterfaceData& InputData = InParams.InputData;
         const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
-        return MakeUnique<FGlobalTransportControlOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutResults);
+        return MakeUnique<FGlobalTransportControlOperator>(InParams, InParams.OperatorSettings, InputData, InputInterface, OutResults);
     }
 
     FGlobalTransportControlOperator(
         const FBuildOperatorParams& InParams,
         const FOperatorSettings& InSettings,
-        const FInputVertexInterfaceData& InputCollection,
+        const FInputVertexInterfaceData& InputData,
         const FInputVertexInterface& InputInterface,
         FBuildResults& OutResults)
-        : LatchTrigger(InputCollection.GetOrConstructDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportLatch), InSettings))
-        , TransportBPM(InputCollection.GetOrCreateDefaultDataReadReference<float>(METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
-        , TransportRun(InputCollection.GetOrCreateDefaultDataReadReference<bool>(METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
-        , TransportNum(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
-        , TransportDen(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
-        , TransportBeatTime(InputCollection.GetOrCreateDefaultDataReadReference<FTime>(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), InSettings))
-        , TransportSeek(InputCollection.GetOrConstructDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
+        : LatchTrigger(InputData.GetOrConstructDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportLatch), InSettings))
+        , TransportBPM(InputData.GetOrCreateDefaultDataReadReference<float>(METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
+        , TransportRun(InputData.GetOrCreateDefaultDataReadReference<bool>(METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
+        , TransportNum(InputData.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
+        , TransportDen(InputData.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
+        , TransportBeatTime(InputData.GetOrCreateDefaultDataReadReference<FTime>(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), InSettings))
+        , TransportSeek(InputData.GetOrConstructDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
     {
     }
 
@@ -578,21 +578,21 @@ class FTransportGetOperator : public TExecutableOperator<FTransportGetOperator>
         return Interface;
     }
 
-    static TUniquePtr<IOperator> CreateOperator(const FCreateOperatorParams& InParams, FBuildErrorArray& OutErrors)
+    static TUniquePtr<IOperator> CreateOperator(const FBuildOperatorParams& InParams, FBuildResults& OutResults)
     {
-        const FDataReferenceCollection& InputCollection = InParams.InputDataReferences;
+        const FInputVertexInterfaceData& InputData = InParams.InputData;
         const FInputVertexInterface& InputInterface = GetVertexInterface().GetInputInterface();
 
-        return MakeUnique<FTransportGetOperator>(InParams, InParams.OperatorSettings, InputCollection, InputInterface, OutErrors);
+        return MakeUnique<FTransportGetOperator>(InParams, InParams.OperatorSettings, InputData, InputInterface, OutResults);
     }
 
     FTransportGetOperator(
-        const FCreateOperatorParams& InParams,
+        const FBuildOperatorParams& InParams,
         const FOperatorSettings& InSettings,
-        const FDataReferenceCollection& InputCollection,
+        const FInputVertexInterfaceData& InputData,
         const FInputVertexInterface& InputInterface,
-        FBuildErrorArray& OutErrors)
-        : Transport(InputCollection.GetDataReadReferenceOrConstruct<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)))
+        FBuildResults& OutResults)
+        : Transport(InputData.GetDataReadReference<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)))
         , TransportRun(FBoolWriteRef::CreateNew(false))
         , TransportBPM(FFloatWriteRef::CreateNew(100.0))
         , TransportBar(FInt32WriteRef::CreateNew(0))
