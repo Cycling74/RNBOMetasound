@@ -92,7 +92,7 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>, public 
         : FMidiVoiceGeneratorBase()
 
         , SampleRate(InSettings.GetSampleRate())
-        , Trigger(InputCollection.GetOrConstructDataReadReference<Metasound::FTrigger>(METASOUND_GET_PARAM_NAME(ParamMakeNoteTrig), InSettings))
+        , Trigger(InputCollection.GetOrCreateDefaultDataReadReference<Metasound::FTrigger>(METASOUND_GET_PARAM_NAME(ParamMakeNoteTrig), InSettings))
 
         , NoteNum(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamMakeNoteNote), InSettings))
         , NoteVel(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamMakeNoteVel), InSettings))

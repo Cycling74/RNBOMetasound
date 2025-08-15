@@ -432,11 +432,11 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
 
         // INPUTS
         for (auto& it : InportTrig()) {
-            mInportTriggerParams.emplace(it.first, InputCollection.GetOrConstructDataReadReference<Metasound::FTrigger>(it.second.Name(), InSettings));
+            mInportTriggerParams.emplace(it.first, InputCollection.GetOrCreateDefaultDataReadReference<Metasound::FTrigger>(it.second.Name(), InSettings));
         }
 
         if (WithMIDIIn()) {
-            MIDIIn = { InputCollection.GetOrConstructDataReadReference<HarmonixMetasound::FMidiStream>(METASOUND_GET_PARAM_NAME(ParamMIDIIn)) };
+            MIDIIn = { InputCollection.GetOrCreateDefaultDataReadReference<HarmonixMetasound::FMidiStream>(METASOUND_GET_PARAM_NAME(ParamMIDIIn), InSettings) };
         }
 
         for (auto& it : InputFloatParams()) {
@@ -463,7 +463,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         }
 
         for (auto& p : InputAudioParams()) {
-            mInputAudioParams.emplace_back(InputCollection.GetOrConstructDataReadReference<Metasound::FAudioBuffer>(p.Name(), InSettings));
+            mInputAudioParams.emplace_back(InputCollection.GetOrCreateDefaultDataReadReference<Metasound::FAudioBuffer>(p.Name(), InSettings));
             mInputAudioBuffers.emplace_back(nullptr);
         }
 
@@ -495,7 +495,7 @@ class FRNBOOperator : public Metasound::TExecutableOperator<FRNBOOperator<desc, 
         }
 
         if (WithTransport()) {
-            Transport = { InputCollection.GetOrConstructDataReadReference<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport)) };
+            Transport = { InputCollection.GetOrCreateDefaultDataReadReference<FTransport>(METASOUND_GET_PARAM_NAME(ParamTransport), InSettings) };
         }
     }
 

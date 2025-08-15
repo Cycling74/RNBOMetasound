@@ -200,7 +200,7 @@ class FTransportOperator : public TExecutableOperator<FTransportOperator>
         , TransportNum(InputData.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
         , TransportDen(InputData.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
         , TransportBeatTime(InputData.GetOrCreateDefaultDataReadReference<FTime>(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), InSettings))
-        , TransportSeek(InputData.GetOrConstructDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
+        , TransportSeek(InputData.GetOrCreateDefaultDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
         , Transport(FTransportWriteRef::CreateNew(false))
     {
     }
@@ -468,13 +468,13 @@ class FGlobalTransportControlOperator : public TExecutableOperator<FGlobalTransp
         const FInputVertexInterfaceData& InputData,
         const FInputVertexInterface& InputInterface,
         FBuildResults& OutResults)
-        : LatchTrigger(InputData.GetOrConstructDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportLatch), InSettings))
+        : LatchTrigger(InputData.GetOrCreateDefaultDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportLatch), InSettings))
         , TransportBPM(InputData.GetOrCreateDefaultDataReadReference<float>(METASOUND_GET_PARAM_NAME(ParamTransportBPM), InSettings))
         , TransportRun(InputData.GetOrCreateDefaultDataReadReference<bool>(METASOUND_GET_PARAM_NAME(ParamTransportRun), InSettings))
         , TransportNum(InputData.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportNum), InSettings))
         , TransportDen(InputData.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamTransportDen), InSettings))
         , TransportBeatTime(InputData.GetOrCreateDefaultDataReadReference<FTime>(METASOUND_GET_PARAM_NAME(ParamTransportBeatTime), InSettings))
-        , TransportSeek(InputData.GetOrConstructDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
+        , TransportSeek(InputData.GetOrCreateDefaultDataReadReference<FTrigger>(METASOUND_GET_PARAM_NAME(ParamTransportSeek), InSettings))
     {
     }
 
