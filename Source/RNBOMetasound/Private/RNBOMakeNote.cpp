@@ -1,5 +1,4 @@
-#include "RNBONode.h"
-
+#include "MetasoundFacade.h"
 #include "MetasoundParamHelper.h"
 #include "MetasoundDataReferenceMacro.h"
 #include "MetasoundTime.h"
@@ -10,7 +9,6 @@
 namespace {
 
 using namespace Metasound;
-using namespace RNBOMetasound;
 
 #define LOCTEXT_NAMESPACE "FRNBOMakeNote"
 
@@ -74,6 +72,7 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>, public 
         static const FVertexInterface Interface = InitVertexInterface();
         return Interface;
     }
+
 
     static TUniquePtr<IOperator> CreateOperator(const Metasound::FBuildOperatorParams& InParams, Metasound::FBuildResults& OutResults)
     {
@@ -167,6 +166,6 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>, public 
 
 #undef LOCTEXT_NAMESPACE
 
-using MakeNoteOperatorNode = FGenericNode<FMakeNoteOperator>;
+using MakeNoteOperatorNode = Metasound::TNodeFacade<FMakeNoteOperator>;
 METASOUND_REGISTER_NODE(MakeNoteOperatorNode)
 } // namespace

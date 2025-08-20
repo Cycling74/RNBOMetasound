@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RNBONode.h"
+#include "MetasoundFacade.h"
 #include "RNBOTransport.h"
 
 // visual studio warnings we're having trouble with

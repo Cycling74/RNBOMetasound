@@ -1,5 +1,5 @@
 #include "RNBOTransport.h"
-#include "RNBONode.h"
+#include "MetasoundFacade.h"
 
 #include "MetasoundParamHelper.h"
 #include "MetasoundDataReferenceMacro.h"
@@ -672,16 +672,16 @@ class FTransportGetOperator : public TExecutableOperator<FTransportGetOperator>
     FInt32WriteRef TransportDen;
 };
 
-using TransportOperatorNode = FGenericNode<FTransportOperator>;
+using TransportOperatorNode = Metasound::TNodeFacade<FTransportOperator>;
 METASOUND_REGISTER_NODE(TransportOperatorNode)
 
-using GlobalTransportOperatorNode = FGenericNode<FGlobalTransportOperator>;
+using GlobalTransportOperatorNode = Metasound::TNodeFacade<FGlobalTransportOperator>;
 METASOUND_REGISTER_NODE(GlobalTransportOperatorNode)
 
-using GlobalTransportControlOperatorNode = FGenericNode<FGlobalTransportControlOperator>;
+using GlobalTransportControlOperatorNode = Metasound::TNodeFacade<FGlobalTransportControlOperator>;
 METASOUND_REGISTER_NODE(GlobalTransportControlOperatorNode)
 
-using TransportGetOperatorNode = FGenericNode<FTransportGetOperator>;
+using TransportGetOperatorNode = Metasound::TNodeFacade<FTransportGetOperator>;
 METASOUND_REGISTER_NODE(TransportGetOperatorNode)
 } // namespace
 

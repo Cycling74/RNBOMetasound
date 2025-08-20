@@ -1,5 +1,5 @@
 #include "RNBOOperator.h"
-#include "RNBONode.h"
+#include "MetasoundFacade.h"
 #include "MetasoundNodeRegistrationMacro.h"
 
 // visual studio warnings we're having trouble with
