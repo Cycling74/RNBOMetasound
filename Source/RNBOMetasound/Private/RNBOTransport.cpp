@@ -117,14 +117,14 @@ FTime GlobalTransportBeatTime(0.0);
 
 bool GlobalTransportRun = true;
 float GlobalTransportBPM = 100.0f;
-int32 GlobalTransportNum = 4.0;
-int32 GlobalTransportDen = 4.0;
+int32 GlobalTransportNum = 4;
+int32 GlobalTransportDen = 4;
 
 double GlobalTransportNextBeatTime = -1.0;
 bool GlobalTransportNextRun = true;
 float GlobalTransportNextBPM = 100.0f;
-int32 GlobalTransportNextNum = 4.0;
-int32 GlobalTransportNextDen = 4.0;
+int32 GlobalTransportNextNum = 4;
+int32 GlobalTransportNextDen = 4;
 
 double GlobalTransportTimeLast = -1.0;
 uint32 GlobalTransportWatchers = 0;
