@@ -15,7 +15,7 @@ WaveAssetDataRef::WaveAssetDataRef(
     const Metasound::FInputVertexInterfaceData& InputCollection)
     : CoreObject(coreObject)
     , Id(id)
-    , WaveAsset(InputCollection.GetOrConstructDataReadReference<Metasound::FWaveAsset>(Name))
+    , WaveAsset(InputCollection.GetOrCreateDefaultDataReadReference<Metasound::FWaveAsset>(Name, InSettings))
 {
 }
 
@@ -24,7 +24,7 @@ WaveAssetDataRef::~WaveAssetDataRef()
     Cleanup.Push(Task);
     for (auto& t : Cleanup) {
         if (t.IsValid() && !t.IsCompleted()) {
-            t.BusyWait();
+            t.Wait();
         }
     }
 }
