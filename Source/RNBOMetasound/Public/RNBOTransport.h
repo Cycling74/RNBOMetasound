@@ -5,7 +5,7 @@
 #include "MetasoundParamHelper.h"
 
 // visual studio warnings we're having trouble with
-#pragma warning(disable : 4800 4065 4668 4804 4018 4060 4554 4018)
+#pragma warning(disable : 4800 4065 4668 4804 4018 4060 4554 4018 4458 4101)
 #include "RNBO.h"
 
 namespace RNBOMetasound {
