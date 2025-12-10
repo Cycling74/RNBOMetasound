@@ -2,7 +2,6 @@
 
 #include "RNBOMetasound.h"
 #include "RNBOTransport.h"
-#include "MetasoundFrontendRegistries.h"
 #include "MetasoundFrontendModuleRegistrationMacros.h"
 
 void FRNBOMetasoundModule::StartupModule()
