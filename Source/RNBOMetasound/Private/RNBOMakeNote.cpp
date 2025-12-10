@@ -1,5 +1,4 @@
-#include "RNBONode.h"
-
+#include "MetasoundFacade.h"
 #include "MetasoundParamHelper.h"
 #include "MetasoundDataReferenceMacro.h"
 #include "MetasoundTime.h"
@@ -10,7 +9,6 @@
 namespace {
 
 using namespace Metasound;
-using namespace RNBOMetasound;
 
 #define LOCTEXT_NAMESPACE "FRNBOMakeNote"
 
@@ -75,6 +73,7 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>, public 
         return Interface;
     }
 
+
     static TUniquePtr<IOperator> CreateOperator(const Metasound::FBuildOperatorParams& InParams, Metasound::FBuildResults& OutResults)
     {
         const FInputVertexInterfaceData& InputCollection = InParams.InputData;
@@ -92,7 +91,7 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>, public 
         : FMidiVoiceGeneratorBase()
 
         , SampleRate(InSettings.GetSampleRate())
-        , Trigger(InputCollection.GetOrConstructDataReadReference<Metasound::FTrigger>(METASOUND_GET_PARAM_NAME(ParamMakeNoteTrig), InSettings))
+        , Trigger(InputCollection.GetOrCreateDefaultDataReadReference<Metasound::FTrigger>(METASOUND_GET_PARAM_NAME(ParamMakeNoteTrig), InSettings))
 
         , NoteNum(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamMakeNoteNote), InSettings))
         , NoteVel(InputCollection.GetOrCreateDefaultDataReadReference<int32>(METASOUND_GET_PARAM_NAME(ParamMakeNoteVel), InSettings))
@@ -167,6 +166,6 @@ class FMakeNoteOperator : public TExecutableOperator<FMakeNoteOperator>, public 
 
 #undef LOCTEXT_NAMESPACE
 
-using MakeNoteOperatorNode = FGenericNode<FMakeNoteOperator>;
+using MakeNoteOperatorNode = Metasound::TNodeFacade<FMakeNoteOperator>;
 METASOUND_REGISTER_NODE(MakeNoteOperatorNode)
 } // namespace

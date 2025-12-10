@@ -3,7 +3,9 @@
 ![RNBO in MetaSounds](docs/img/music-bed.png)
 *This is experimental software—use at your own risk, and know that anything in this repository could change in the future.*
 
-This repository will help you create custom nodes for a MetaSounds graph in Unreal Engine 5.4+ using RNBO's c++ source export. 
+### UE and RNBO version
+
+This repository will help you create custom nodes for a MetaSounds graph in **Unreal Engine 5.7+** using the C++ source export in **RNBO 1.4.2+**.
 
 In addition to nodes which will hold your RNBO exports, this repository will also build utility nodes, for example, a `Transport` node which will help you utilize RNBO's built-in transport within your MetaSounds graph. 
 
