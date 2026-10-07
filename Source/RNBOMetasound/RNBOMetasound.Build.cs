@@ -18,8 +18,8 @@ public class RNBOMetasound : ModuleRules
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		UnsafeTypeCastWarningLevel = WarningLevel.Warning;
-		ShadowVariableWarningLevel = WarningLevel.Warning;
+		CppCompileWarningSettings.UnsafeTypeCastWarningLevel = WarningLevel.Warning;
+		CppCompileWarningSettings.ShadowVariableWarningLevel = WarningLevel.Warning;
 
 		var templateDir = Path.Combine(PluginDirectory, "Source", "RNBOMetasound", "Template");
 		var templateFile = Path.Combine(templateDir, "MetaSoundOperator.cpp.in");
@@ -126,6 +126,10 @@ public class RNBOMetasound : ModuleRules
 			);
 
 		PrivateDefinitions.Add("RNBO_NO_PATCHERFACTORY=1");
+
+		// module-local MetaSound registration list, see MetasoundFrontendModuleRegistrationMacros.h
+		PrivateDefinitions.Add("METASOUND_PLUGIN=RNBOMetasound");
+		PrivateDefinitions.Add("METASOUND_MODULE=RNBOMetasound");
 	}
 
 	string CreateMetaSound(string path) {
