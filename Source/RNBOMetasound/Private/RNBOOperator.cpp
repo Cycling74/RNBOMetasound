@@ -31,9 +31,10 @@ WaveAssetDataRef::~WaveAssetDataRef()
 
 void WaveAssetDataRef::Update()
 {
-    auto WaveProxy = WaveAsset->GetSoundWaveProxy();
+    auto WaveProxy = WaveAsset->GetWaveProxy();
     if (WaveProxy.IsValid()) {
-        auto key = WaveProxy->GetFObjectKey();
+        TSharedRef<const FSoundWaveData> WaveData = WaveProxy->GetSoundWaveDataRef();
+        auto key = WaveData->GetFObjectKey();
         if (key == WaveAssetProxyKey) {
             return;
         }
@@ -51,13 +52,13 @@ void WaveAssetDataRef::Update()
             FScopeLock Guard(&AsyncTaskPipeMutex);
             Task = AsyncTaskPipe.Launch(
                 UE_SOURCE_LOCATION,
-                [this, WaveProxy]() {
-                    double sr = WaveProxy->GetSampleRate();
-                    size_t chans = WaveProxy->GetNumChannels();
-                    // int32 frames = WaveProxy->GetNumFrames();
-                    // double duration = WaveProxy->GetDuration();
+                [this, WaveData]() {
+                    double sr = WaveData->GetSampleRate();
+                    size_t chans = WaveData->GetNumChannels();
+                    // int32 frames = WaveData->GetNumFrames();
+                    // double duration = WaveData->GetDuration();
 
-                    FName Format = WaveProxy->GetRuntimeFormat();
+                    FName Format = WaveData->GetRuntimeFormat();
                     IAudioInfoFactory* Factory = IAudioInfoFactoryRegistry::Get().Find(Format);
                     if (Factory == nullptr) {
                         UE_LOG(LogMetaSound, Error, TEXT("IAudioInfoFactoryRegistry::Get().Find(%s) failed"), *Format.ToString());
@@ -68,8 +69,8 @@ void WaveAssetDataRef::Update()
                     FSoundQualityInfo quality;
                     TArray<uint8> Buf;
                     int32 ValidBytes = 0;
-                    if (WaveProxy->IsStreaming()) {
-                        if (!Decompress->StreamCompressedInfo(WaveProxy, &quality)) {
+                    if (WaveData->IsStreaming()) {
+                        if (!Decompress->StreamCompressedInfo(WaveData, &quality)) {
                             UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to get compressed stream info"));
                             return;
                         }
@@ -77,7 +78,7 @@ void WaveAssetDataRef::Update()
                         Decompress->StreamCompressedData(Buf.GetData(), false, Buf.Num(), ValidBytes);
                     }
                     else {
-                        if (!Decompress->ReadCompressedInfo(WaveProxy->GetResourceData(), WaveProxy->GetResourceSize(), &quality)) {
+                        if (!Decompress->ReadCompressedInfo(WaveData->GetResourceData(), WaveData->GetResourceSize(), &quality)) {
                             UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to get compressed info"));
                             return;
                         }
