@@ -5,7 +5,7 @@
 
 ### UE and RNBO version
 
-This repository will help you create custom nodes for a MetaSounds graph in **Unreal Engine 5.7+** using the C++ source export in **RNBO 1.4.2+**.
+This repository will help you create custom nodes for a MetaSounds graph in **Unreal Engine 5.8+** using the C++ source export in **RNBO 1.4.2+**.
 
 In addition to nodes which will hold your RNBO exports, this repository will also build utility nodes, for example, a `Transport` node which will help you utilize RNBO's built-in transport within your MetaSounds graph. 
 
@@ -31,5 +31,5 @@ You can read more about each of the following topics in [our documentation](docs
 
 ## Links
 
-* [MetaSounds Reference Guide](https://dev.epicgames.com/documentation/en-us/unreal-engine/metasounds-reference-guide-in-unreal-engine?application_version=5.4)
-* [Unreal Build Tool](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-build-tool-in-unreal-engine?application_version=5.4)
+* [MetaSounds Reference Guide](https://dev.epicgames.com/documentation/en-us/unreal-engine/metasounds-reference-guide-in-unreal-engine?application_version=5.8)
+* [Unreal Build Tool](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-build-tool-in-unreal-engine?application_version=5.8)
