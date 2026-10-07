@@ -65,7 +65,11 @@ void WaveAssetDataRef::Update()
                         return;
                     }
 
-                    ICompressedAudioInfo* Decompress = Factory->Create();
+                    TUniquePtr<ICompressedAudioInfo> Decompress(Factory->Create());
+                    if (!Decompress.IsValid()) {
+                        UE_LOG(LogMetaSound, Error, TEXT("RNBO Failed to create audio decoder for format %s"), *Format.ToString());
+                        return;
+                    }
                     FSoundQualityInfo quality;
                     TArray<uint8> Buf;
                     int32 ValidBytes = 0;
